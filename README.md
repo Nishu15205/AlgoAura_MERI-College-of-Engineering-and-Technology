@@ -139,9 +139,17 @@ The what-if engine reuses the **same physiological model that generated the synt
 
 ## Video
 
-A 3-minute demo of GlucoTwin is available at: **`[VIDEO_LINK]`**
+A 2-5 minute demo of GlucoTwin will be available at: **`[VIDEO_LINK]`** _(upload as unlisted YouTube video and paste the link here)_
 
 The demo script and the slide-by-slide breakdown live in [`docs/video_script.md`](docs/video_script.md) and [`docs/presentation_outline.md`](docs/presentation_outline.md).
+
+### Submission deliverables
+
+| Deliverable | File |
+|---|---|
+| Architecture diagram (PDF) | [`docs/GlucoTwin_Architecture.pdf`](docs/GlucoTwin_Architecture.pdf) |
+| Presentation (PPTX) | [`docs/GlucoTwin_Presentation.pptx`](docs/GlucoTwin_Presentation.pptx) |
+| Video demo | `[VIDEO_LINK]` (to be recorded) |
 
 ---
 
