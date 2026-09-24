@@ -1,0 +1,84 @@
+// GlucoTwin Prisma schema
+// A digital twin of a Type-2 diabetes patient.
+// Synthetic data only — no real patient data (DPDP / HIPAA compliant by construction).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---- Static synthetic EHR record for one virtual patient ----
+model Patient {
+  id                      String   @id                   // e.g. "P0001"
+  name                    String                         // synthetic name
+  age                     Int      // 30-75
+  sex                     String   // "male" | "female"
+  bmi                     Float    // 22-42
+  hba1c                   Float    // 6.5-11 (%)
+  yearsSinceDiagnosis     Int      // 0-25
+  medication              String   // "none" | "metformin" | "metformin+insulin"
+  hypertension            Int      // 0/1
+  familyHistoryDiabetes   Int      // 0/1
+  geneticRiskScore        Float    // 0-1
+  fastingGlucose          Float    // mg/dL
+  egfr                    Float    // mL/min/1.73m2
+
+  // Latest computed risk snapshot (updated by the data/training pipeline)
+  latestRisk              Float?   // 0-1 spike probability
+  latestRiskBand          String?  // "Low" | "Medium" | "High"
+  latestGlucose           Float?   // mg/dL
+  updatedAt               DateTime @updatedAt
+
+  // relations
+  samples                 WearableSample[]
+  alerts                  RiskAlert[]
+
+  @@index([id])
+}
+
+// ---- Dynamic synthetic wearable time-series (5-min intervals, 14 days) ----
+model WearableSample {
+  id            Int      @id @default(autoincrement())
+  patientId     String
+  ts            Int      // unix epoch seconds (5-min grid)
+  // tsHuman added for convenience via a string column
+  tsHuman       String
+  glucose       Float    // mg/dL (CGM)
+  heartRate     Int      // bpm
+  hrvRmssd      Float    // ms
+  steps         Int      // cumulative steps in that 5-min bucket
+  sleepStage    String   // "awake" | "light" | "deep" | "rem"
+  mealCarbsG    Float    // grams of carbs for a meal event at this ts (0 if none)
+  activityMin   Float    // minutes of activity in this 5-min bucket
+
+  patient       Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, ts])
+}
+
+// ---- Risk alert timeline entries (derived from model predictions over history) ----
+model RiskAlert {
+  id            Int      @id @default(autoincrement())
+  patientId     String
+  ts            Int
+  tsHuman       String
+  risk          Float    // predicted spike probability at that time
+  triggered     Int      // 1 if risk crossed the alert threshold
+  glucoseAtT    Float
+  peakGlucose   Float?   // actual peak in next 120 min (for replay/eval)
+  patient       Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, ts])
+}
+
+// ---- Serialized model artifacts + metrics (stored as JSON strings) ----
+model ModelArtifact {
+  id            Int      @id @default(1)
+  name          String   // "gbdt" | "logreg" | "meta"
+  payload       String   // JSON blob
+  updatedAt     DateTime @updatedAt
+}
