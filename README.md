@@ -8,10 +8,10 @@ A Type-2 Diabetes Digital Twin that predicts glucose spikes before they happen, 
 
 ## Team
 
-- **Team name:** `[TeamName]`
-- **Members:** `[Member 1, Member 2, Member 3, Member 4, Member 5]`
-- **College / Incubator:** `[CollegeName]`
+- **Team name:** AlgoAura
+- **College / Incubator:** MERI College of Engineering and Technology
 - **Hackathon:** Happiest Health "Digital Twin Challenge 2026"
+- **Members:** _(add team leader + members here — up to 4 students)_
 
 ---
 
