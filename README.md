@@ -11,7 +11,9 @@ A Type-2 Diabetes Digital Twin that predicts glucose spikes before they happen, 
 - **Team name:** AlgoAura
 - **College / Incubator:** MERI College of Engineering and Technology
 - **Hackathon:** Happiest Health "Digital Twin Challenge 2026"
-- **Members:** _(add team leader + members here — up to 4 students)_
+- **Members:**
+  - **Nishu Raj** — Team Leader
+  - **Vishesh Pratap Singh** — Member
 
 ---
 
@@ -342,17 +344,15 @@ curl -X POST http://localhost:3000/api/patients/P0001/whatif \
 
 ## Screenshots
 
-Drop screenshots into `docs/screenshots/` and link them below.
+![Patient List — searchable table of 200 virtual patients with risk badges](docs/screenshots/patient-list.png)
 
-![Patient List](docs/screenshots/patient-list.png)
+![Digital Twin View — glucose chart with 2-hour prediction, risk gauge, SHAP reasons, EHR + wearable panels, alert timeline](docs/screenshots/digital-twin.png)
 
-![Digital Twin View](docs/screenshots/digital-twin.png)
+![What-if Simulator — sliders for meal/walk/sleep/medication with baseline vs simulated glucose curves](docs/screenshots/whatif.png)
 
-![What-if Simulator](docs/screenshots/whatif.png)
+![Model Insights — metrics table, confusion matrix, ROC/PR curves, feature importance](docs/screenshots/model-insights.png)
 
-![Model Insights](docs/screenshots/model-insights.png)
-
-![About](docs/screenshots/about.png)
+![About — architecture diagram, tech stack, and disclaimers](docs/screenshots/about.png)
 
 ---
 
