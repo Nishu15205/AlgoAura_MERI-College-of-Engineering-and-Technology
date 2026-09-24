@@ -10,27 +10,27 @@ This document describes how GlucoTwin fits together end-to-end: how the syntheti
 
 ```mermaid
 flowchart TB
-    subgraph Build["Build pipeline — scripts/build-all.ts (one command: bun run build:all)"]
+    subgraph Build["Build pipeline — scripts/build-all.ts"]
         direction TB
-        S1[Step 1: RNG seed 20260117] --> S2[generateEhr: 200 patients<br/>correlated EHR fields]
-        S1 --> S3[generateWearablesAll: 14d x 5min x 200<br/>= 806,400 samples<br/>physiological glucose model]
-        S2 --> S4[write data/ehr.csv]
-        S3 --> S5[write data/wearables.csv]
-        S2 --> S6[computeFeatures: 33-feature fusion<br/>label = max glucose in next 120 min > 180]
+        S1["Step 1: RNG seed 20260117"] --> S2["generateEhr: 200 patients<br/>correlated EHR fields"]
+        S1 --> S3["generateWearablesAll: 14d x 5min x 200<br/>= 806,400 samples"]
+        S2 --> S4["write data/ehr.csv"]
+        S3 --> S5["write data/wearables.csv"]
+        S2 --> S6["computeFeatures: 33-feature fusion<br/>label = max glucose next 120 min > 180"]
         S3 --> S6
-        S6 --> S7[Patient-wise split 70/15/15<br/>no row leakage]
-        S7 --> S8[Train LogisticRegression<br/>Train GBDT classifier 80 trees<br/>Train GBDT regressors +30/+60/+120]
-        S8 --> S9[Evaluate on held-out test patients<br/>ROC/PR/F1/confusion/lead-time]
-        S9 --> S10[Write ml/*.json artifacts<br/>Write ml/metrics.json]
-        S10 --> S11[Seed SQLite: patients + 3d wearables<br/>+ risk-alert timeline + latest-risk snapshot]
+        S6 --> S7["Patient-wise split 70/15/15<br/>no row leakage"]
+        S7 --> S8["Train LogisticRegression<br/>Train GBDT classifier 80 trees<br/>Train GBDT regressors"]
+        S8 --> S9["Evaluate on held-out test patients<br/>ROC/PR/F1/confusion/lead-time"]
+        S9 --> S10["Write ml artifacts + metrics.json"]
+        S10 --> S11["Seed SQLite: patients + 3d wearables<br/>+ risk-alert timeline"]
     end
 
     subgraph Runtime["Runtime — bun run dev (port 3000)"]
         direction TB
-        DB[(SQLite via Prisma)] --> API
-        ML[(ml/*.json model artifacts)] --> API[Next.js Route Handlers<br/>src/app/api/**/route.ts]
-        API --> SSE[/api/stream/:id SSE]
-        API --> DASH[Doctor dashboard<br/>src/app/page.tsx + components/glucotwin/]
+        DB[("SQLite via Prisma")] --> API
+        ML[("ml model artifacts")] --> API["Next.js Route Handlers"]
+        API --> SSE["GET /api/stream/id SSE"]
+        API --> DASH["Doctor dashboard"]
         SSE --> DASH
     end
 ```
@@ -42,39 +42,39 @@ flowchart TB
 ```mermaid
 flowchart LR
     subgraph DataLayer["Data layer"]
-        EHR[(EHR: prisma.Patient<br/>+ data/ehr.csv)]
-        WBL[(Wearables: prisma.WearableSample<br/>+ data/wearables.csv)]
-        ART[(Model artifacts: ml/*.json)]
+        EHR[("EHR: prisma.Patient")]
+        WBL[("Wearables: prisma.WearableSample")]
+        ART[("Model artifacts: ml/*.json")]
     end
 
     subgraph MLCORE["ML core — src/lib/ml/"]
-        RNG[rng.ts<br/>mulberry32, seed 20260117]
-        DG[data-generator.ts<br/>200 patients + 14d wearables]
-        FEAT[features.ts<br/>33-feature fusion + label]
-        LR[logistic-regression.ts<br/>gradient descent, L2]
-        GBDT[gbdt.ts<br/>histogram + Newton + Saabas]
-        MET[metrics.ts<br/>ROC/PR/F1/confusion/lead-time]
-        PRED[predict.ts<br/>inference + reasons + curve]
-        SIM[twin-simulator.ts<br/>what-if engine]
+        RNG["rng.ts<br/>mulberry32, seed 20260117"]
+        DG["data-generator.ts<br/>200 patients + 14d wearables"]
+        FEAT["features.ts<br/>33-feature fusion + label"]
+        LR["logistic-regression.ts<br/>gradient descent, L2"]
+        GBDT["gbdt.ts<br/>histogram + Newton + Saabas"]
+        MET["metrics.ts<br/>ROC/PR/F1/confusion/lead-time"]
+        PRED["predict.ts<br/>inference + reasons + curve"]
+        SIM["twin-simulator.ts<br/>what-if engine"]
     end
 
     subgraph APILAYER["API layer — src/app/api/"]
-        H[health]
-        PL[patients]
-        P1[patients/:id]
-        TS[patients/:id/timeseries]
-        RK[patients/:id/risk]
-        WI[patients/:id/whatif POST]
-        MM[model/metrics]
-        ST[stream/:id SSE]
+        H["health"]
+        PL["patients"]
+        P1["patients/id"]
+        TS["patients/id/timeseries"]
+        RK["patients/id/risk"]
+        WI["patients/id/whatif POST"]
+        MM["model/metrics"]
+        ST["stream/id SSE"]
     end
 
     subgraph UILAYER["UI layer — src/app/page.tsx"]
-        V1[Patient List]
-        V2[Digital Twin View]
-        V3[What-if Simulator]
-        V4[Model Insights]
-        V5[About]
+        V1["Patient List"]
+        V2["Digital Twin View"]
+        V3["What-if Simulator"]
+        V4["Model Insights"]
+        V5["About"]
     end
 
     RNG --> DG --> EHR

@@ -165,54 +165,54 @@ GlucoTwin is released under the **MIT License** — see [`LICENSE`](LICENSE). Co
 
 ```mermaid
 flowchart LR
-    subgraph DataGen["1. Data generation (scripts/build-all.ts)"]
-        A[RNG seed 20260117] --> B[generateEhr: 200 patients]
-        A --> C[generateWearablesAll: 14d x 5min x 200]
+    subgraph DataGen["1. Data generation"]
+        A["RNG seed 20260117"] --> B["generateEhr: 200 patients"]
+        A --> C["generateWearablesAll: 14d x 5min x 200"]
     end
 
-    B --> D[(data/ehr.csv)]
-    C --> E[(data/wearables.csv)]
-    B --> F[(SQLite via Prisma)]
+    B --> D[("data/ehr.csv")]
+    C --> E[("data/wearables.csv")]
+    B --> F[("SQLite via Prisma")]
     C --> F
 
-    subgraph Features["2. Feature fusion (src/lib/ml/features.ts)"]
-        G[computeFeatures: 6h CGM window + EHR -> 33 features]
+    subgraph Features["2. Feature fusion"]
+        G["computeFeatures: 6h CGM window + EHR -> 33 features"]
     end
     E --> G
     D --> G
 
-    subgraph Train["3. Training (scripts/build-all.ts)"]
-        G --> H[Patient-wise split 70/15/15]
-        H --> I[LogisticRegression]
-        H --> J[GBDT classifier 80 trees]
-        H --> K[GBDT regressors +30/+60/+120]
+    subgraph Train["3. Training"]
+        G --> H["Patient-wise split 70/15/15"]
+        H --> I["LogisticRegression"]
+        H --> J["GBDT classifier 80 trees"]
+        H --> K["GBDT regressors +30/+60/+120"]
     end
 
-    I --> L[(ml/logreg.json)]
-    J --> M[(ml/gbdt-classification.json)]
-    K --> N[(ml/gbdt-regression*.json)]
-    J --> O[(ml/metrics.json)]
+    I --> L[("ml/logreg.json")]
+    J --> M[("ml/gbdt-classification.json")]
+    K --> N[("ml/gbdt-regression.json")]
+    J --> O[("ml/metrics.json")]
 
-    subgraph API["4. API (src/app/api/**/route.ts)"]
-        O --> P[/api/model/metrics]
-        F --> Q[/api/patients]
-        F --> R[/api/patients/:id]
-        F --> S[/api/patients/:id/timeseries]
-        M --> T[/api/patients/:id/risk]
-        U[Twin Simulator] --> V[/api/patients/:id/whatif POST]
-        F --> W[/api/stream/:id SSE]
+    subgraph API["4. API"]
+        O --> P["GET /api/model/metrics"]
+        F --> Q["GET /api/patients"]
+        F --> R["GET /api/patients/id"]
+        F --> S["GET /api/patients/id/timeseries"]
+        M --> T["GET /api/patients/id/risk"]
+        U["Twin Simulator"] --> V["POST /api/patients/id/whatif"]
+        F --> W["GET /api/stream/id SSE"]
     end
     T --> U
 
-    subgraph UI["5. Dashboard (src/app/page.tsx)"]
-        Q --> X1[Patient List]
-        R --> X2[Digital Twin View]
+    subgraph UI["5. Dashboard"]
+        Q --> X1["Patient List"]
+        R --> X2["Digital Twin View"]
         T --> X2
         S --> X2
-        V --> X3[What-if Simulator]
-        P --> X4[Model Insights]
+        V --> X3["What-if Simulator"]
+        P --> X4["Model Insights"]
         W --> X2
-        X5[About] --> X6[Disclaimer banner everywhere]
+        X5["About"] --> X6["Disclaimer banner everywhere"]
     end
     Q --> X1
     V --> X3
