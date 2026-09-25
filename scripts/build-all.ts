@@ -17,6 +17,7 @@ import { generateEhr, generateWearablesAll, N_PATIENTS } from "@/lib/ml/data-gen
 import { buildPatientSamples, FEATURE_NAMES, computeFeatures } from "@/lib/ml/features";
 import { LogisticRegression } from "@/lib/ml/logistic-regression";
 import { GBDT } from "@/lib/ml/gbdt";
+import { RandomForest } from "@/lib/ml/random-forest";
 import {
   confusionMatrix,
   reportMetrics,
@@ -24,6 +25,8 @@ import {
   rocCurve,
   prCurve,
 } from "@/lib/ml/metrics";
+import { fitCalibrator, calibrate, calibrationCurve, expectedCalibrationError } from "@/lib/ml/calibration";
+import { computeCgmMetrics } from "@/lib/ml/cgm-metrics";
 import { RNG } from "@/lib/ml/rng";
 import type { EhrRecord, WearableSample, LabeledSample, MetricsReport } from "@/lib/ml/types";
 import { PrismaClient } from "@prisma/client";
@@ -99,11 +102,58 @@ async function main() {
   clf.fit(Xtr, ytr);
   const clfValScores = Xval.map((x) => clf.predictProba(x));
   const threshold = bestThreshold(clfValScores, yval);
-  const clfTestScores = Xte.map((x) => clf.predictProba(x));
-  const clfMetrics = reportMetrics("gbdt", clfTestScores, yte, threshold);
+  let clfTestScores = Xte.map((x) => clf.predictProba(x));
+  let clfMetrics = reportMetrics("gbdt", clfTestScores, yte, threshold);
   log(`  -> gbdt ROC-AUC ${clfMetrics.rocAuc.toFixed(3)}, PR-AUC ${clfMetrics.prAuc.toFixed(3)}, F1 ${clfMetrics.f1.toFixed(3)}`);
 
-  log("Step 4c: training GBDT regressor (glucose @ +120 min)...");
+  log("Step 4c: training Random Forest (3-way comparison)...");
+  const rf = new RandomForest({ nTrees: 60, maxDepth: 6, minChildWeight: 5, featureSampleFrac: 0.5 });
+  rf.fit(Xtr, ytr, 2026);
+  const rfValScores = Xval.map((x) => rf.predictProba(x));
+  const rfThreshold = bestThreshold(rfValScores, yval);
+  const rfTestScores = Xte.map((x) => rf.predictProba(x));
+  const rfMetrics = reportMetrics("randomforest", rfTestScores, yte, rfThreshold);
+  log(`  -> rf ROC-AUC ${rfMetrics.rocAuc.toFixed(3)}, F1 ${rfMetrics.f1.toFixed(3)}`);
+
+  log("Step 4d: Platt calibration on GBDT (clinical-grade probabilities)...");
+  const calibrator = fitCalibrator(clfValScores, yval);
+  const clfTestScoresCal = clfTestScores.map((s) => calibrate(s, calibrator));
+  const clfMetricsCal = reportMetrics("gbdt-calibrated", clfTestScoresCal, yte, threshold);
+  const calCurve = calibrationCurve(clfTestScoresCal, yte, 10);
+  const ece = expectedCalibrationError(calCurve);
+  log(`  -> calibrated ROC-AUC ${clfMetricsCal.rocAuc.toFixed(3)}, ECE ${ece.toFixed(3)}`);
+  // use calibrated scores going forward
+  clfTestScores = clfTestScoresCal;
+  clfMetrics = clfMetricsCal;
+
+  log("Step 4e: 5-fold patient-wise cross-validation (GBDT)...");
+  const foldMetrics: { rocAuc: number; f1: number }[] = [];
+  const foldRng = new RNG(99);
+  const cvPatientIds = foldRng.shuffle(ehr.map((e) => e.patientId));
+  const nFolds = 5;
+  const foldSize = Math.floor(cvPatientIds.length / nFolds);
+  for (let f = 0; f < nFolds; f++) {
+    const valStart = f * foldSize;
+    const valEnd = f === nFolds - 1 ? cvPatientIds.length : (f + 1) * foldSize;
+    const valFoldIds = new Set(cvPatientIds.slice(valStart, valEnd));
+    const trainFold = allSamples.filter((s) => !valFoldIds.has(s.patientId));
+    const valFold = allSamples.filter((s) => valFoldIds.has(s.patientId));
+    if (trainFold.length === 0 || valFold.length === 0) continue;
+    const cvClf = new GBDT({ kind: "classification", nTrees: 60, maxDepth: 4, learningRate: 0.1, minChildWeight: 10, l2: 1.0, nBins: 32 });
+    cvClf.fit(trainFold.map((s) => s.features), trainFold.map((s) => s.label));
+    const cvScores = valFold.map((s) => cvClf.predictProba(s.features));
+    const cvLabels = valFold.map((s) => s.label);
+    const cvThresh = bestThreshold(cvScores, cvLabels);
+    const cvM = reportMetrics(`fold${f}`, cvScores, cvLabels, cvThresh);
+    foldMetrics.push({ rocAuc: cvM.rocAuc, f1: cvM.f1 });
+    log(`  -> fold ${f + 1}: ROC-AUC ${cvM.rocAuc.toFixed(3)}, F1 ${cvM.f1.toFixed(3)}`);
+  }
+  const cvRocAucMean = foldMetrics.reduce((s, m) => s + m.rocAuc, 0) / Math.max(1, foldMetrics.length);
+  const cvRocAucStd = Math.sqrt(foldMetrics.reduce((s, m) => s + (m.rocAuc - cvRocAucMean) ** 2, 0) / Math.max(1, foldMetrics.length));
+  const cvF1Mean = foldMetrics.reduce((s, m) => s + m.f1, 0) / Math.max(1, foldMetrics.length);
+  log(`  -> CV mean ROC-AUC ${cvRocAucMean.toFixed(3)} ± ${cvRocAucStd.toFixed(3)}, F1 ${cvF1Mean.toFixed(3)}`);
+
+  log("Step 4f: training GBDT regressor (glucose @ +120 min)...");
   const ytrT120 = train.map((s) => s.glucoseT120);
   const reg = new GBDT({ kind: "regression", nTrees: 60, maxDepth: 4, learningRate: 0.1, minChildWeight: 10, l2: 1.0, nBins: 32 });
   reg.fit(Xtr, ytrT120);
@@ -150,9 +200,10 @@ async function main() {
   const pr = prCurve(clfTestScores, yte);
   const importance = clf.featureImportance(FEATURE_NAMES);
 
-  const metricsReport: MetricsReport = {
+  const metricsReport: any = {
     logreg: lrMetrics,
     gbdt: clfMetrics,
+    randomForest: rfMetrics,
     regression: { maeT30: mae30, maeT60: mae60, maeT120: mae120, residualStd120: residStd },
     threshold,
     confusionMatrix: { tp: cm.tp, fp: cm.fp, fn: cm.fn, tn: cm.tn },
@@ -160,6 +211,18 @@ async function main() {
     rocCurve: roc,
     prCurve: pr,
     featureImportance: importance,
+    calibration: {
+      ece,
+      curve: calCurve,
+      plattA: calibrator.a,
+      plattB: calibrator.b,
+    },
+    crossValidation: {
+      folds: foldMetrics,
+      rocAucMean: cvRocAucMean,
+      rocAucStd: cvRocAucStd,
+      f1Mean: cvF1Mean,
+    },
     generatedAt: new Date().toISOString(),
     nPatients: N_PATIENTS,
     nSamples: allSamples.length,
@@ -171,11 +234,13 @@ async function main() {
   fs.writeFileSync(path.join(ML_DIR, "gbdt-regression-30.json"), JSON.stringify(reg30.toJSON()));
   fs.writeFileSync(path.join(ML_DIR, "gbdt-regression-60.json"), JSON.stringify(reg60.toJSON()));
   fs.writeFileSync(path.join(ML_DIR, "logreg.json"), JSON.stringify(logreg.toJSON()));
+  fs.writeFileSync(path.join(ML_DIR, "random-forest.json"), JSON.stringify(rf.toJSON()));
+  fs.writeFileSync(path.join(ML_DIR, "calibrator.json"), JSON.stringify(calibrator));
   fs.writeFileSync(path.join(ML_DIR, "metrics.json"), JSON.stringify(metricsReport, null, 2));
   fs.writeFileSync(path.join(ML_DIR, "feature-names.json"), JSON.stringify(FEATURE_NAMES));
 
   log("Step 7: seeding SQLite DB...");
-  await seedDb(ehr, wearables, clf, threshold);
+  await seedDb(ehr, wearables, clf, threshold, calibrator);
 
   log(`Done in ${((Date.now() - t0) / 1000).toFixed(1)}s.`);
   log("Models + metrics in ml/, data CSVs in data/, DB seeded.");
@@ -228,7 +293,8 @@ async function seedDb(
   ehr: EhrRecord[],
   wearables: Map<string, WearableSample[]>,
   clf: GBDT,
-  threshold: number
+  threshold: number,
+  calibrator: { a: number; b: number }
 ) {
   const prisma = new PrismaClient();
   try {
@@ -294,7 +360,7 @@ async function seedDb(
       const feats = computeFeatures(series, e, lastIdx);
       let latestRisk = 0;
       let latestGlucose = series[lastIdx].glucose;
-      if (feats) latestRisk = clf.predictProba(feats);
+      if (feats) latestRisk = calibrate(clf.predictProba(feats), calibrator);
       const band = latestRisk < 0.3 ? "Low" : latestRisk < 0.6 ? "Medium" : "High";
       await prisma.patient.update({
         where: { id: e.patientId },
@@ -311,7 +377,7 @@ async function seedDb(
       for (let i = Math.max(72, last24hStart); i < series.length - 1; i += 6) {
         const f = computeFeatures(series, e, i);
         if (!f) continue;
-        const proba = clf.predictProba(f);
+        const proba = calibrate(clf.predictProba(f), calibrator);
         // peak in next 120 min if available
         let peak: number | null = null;
         if (i + 24 < series.length) {

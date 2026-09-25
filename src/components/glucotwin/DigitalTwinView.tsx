@@ -13,6 +13,7 @@ import { RiskGauge } from "./RiskGauge";
 import { EhrPanel } from "./EhrPanel";
 import { WearablePanel } from "./WearablePanel";
 import { AlertTimeline } from "./AlertTimeline";
+import { CgmMetricsPanel } from "./CgmMetricsPanel";
 import { RiskBadge } from "./RiskBadge";
 import { fetchPatient, fetchTimeseries, fetchRisk } from "./api";
 import type { EhrPatient, WearablePoint, RiskPrediction } from "./types";
@@ -263,9 +264,10 @@ export function DigitalTwinView({
       </div>
 
       {/* secondary grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <EhrPanel patient={patient} />
         <WearablePanel samples={history} />
+        <CgmMetricsPanel patientId={patientId} />
       </div>
 
       <AlertTimeline patientId={patientId} />

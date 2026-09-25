@@ -7,6 +7,7 @@
 import { GBDT } from "./gbdt";
 import { LogisticRegression } from "./logistic-regression";
 import { FEATURE_NAMES, computeFeatures } from "./features";
+import { calibrate, type Calibrator } from "./calibration";
 import type { EhrRecord, WearableSample, Reason } from "./types";
 import * as fs from "fs";
 import * as path from "path";
@@ -17,6 +18,7 @@ let clfCache: GBDT | null = null;
 let regCache: GBDT | null = null;
 let logregCache: LogisticRegression | null = null;
 let thresholdCache = 0.3;
+let calibratorCache: Calibrator | null = null;
 
 function loadClf(): GBDT {
   if (clfCache) return clfCache;
@@ -49,6 +51,17 @@ function loadThreshold(): number {
     thresholdCache = 0.3;
   }
   return thresholdCache;
+}
+
+function loadCalibrator(): Calibrator | null {
+  if (calibratorCache) return calibratorCache;
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(ML_DIR, "calibrator.json"), "utf-8"));
+    calibratorCache = { a: raw.a, b: raw.b };
+  } catch {
+    calibratorCache = null;
+  }
+  return calibratorCache;
 }
 
 /** Build the feature vector for the latest sample of a patient. */
@@ -84,8 +97,11 @@ export function predictRisk(
   const clf = loadClf();
   const reg = loadReg();
   const threshold = loadThreshold();
+  const cal = loadCalibrator();
 
-  const proba = clf.predictProba(features);
+  const rawProba = clf.predictProba(features);
+  // Apply Platt calibration for clinical-grade probabilities
+  const proba = cal ? calibrate(rawProba, cal) : rawProba;
   const band: "Low" | "Medium" | "High" = proba < 0.3 ? "Low" : proba < 0.6 ? "Medium" : "High";
 
   // reasons via tree-interpreter contributions (margin space)

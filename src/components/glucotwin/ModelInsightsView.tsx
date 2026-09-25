@@ -48,19 +48,22 @@ export function ModelInsightsView() {
       </Card>
     );
 
-  const rows: { key: string; label: string; logreg: number; gbdt: number; fmt: (n: number) => string }[] = [
-    { key: "rocAuc", label: "ROC-AUC", logreg: m.logreg.rocAuc, gbdt: m.gbdt.rocAuc, fmt: (n) => n.toFixed(3) },
-    { key: "prAuc", label: "PR-AUC", logreg: m.logreg.prAuc, gbdt: m.gbdt.prAuc, fmt: (n) => n.toFixed(3) },
-    { key: "precision", label: "Precision", logreg: m.logreg.precision, gbdt: m.gbdt.precision, fmt: (n) => (n * 100).toFixed(1) + "%" },
-    { key: "recall", label: "Recall", logreg: m.logreg.recall, gbdt: m.gbdt.recall, fmt: (n) => (n * 100).toFixed(1) + "%" },
-    { key: "f1", label: "F1", logreg: m.logreg.f1, gbdt: m.gbdt.f1, fmt: (n) => n.toFixed(3) },
-    { key: "accuracy", label: "Accuracy", logreg: m.logreg.accuracy, gbdt: m.gbdt.accuracy, fmt: (n) => (n * 100).toFixed(1) + "%" },
-    { key: "brier", label: "Brier score", logreg: m.logreg.brierScore, gbdt: m.gbdt.brierScore, fmt: (n) => n.toFixed(3) },
+  const rows: { key: string; label: string; logreg: number; gbdt: number; rf: number; fmt: (n: number) => string }[] = [
+    { key: "rocAuc", label: "ROC-AUC", logreg: m.logreg.rocAuc, gbdt: m.gbdt.rocAuc, rf: m.randomForest?.rocAuc ?? 0, fmt: (n) => n.toFixed(3) },
+    { key: "prAuc", label: "PR-AUC", logreg: m.logreg.prAuc, gbdt: m.gbdt.prAuc, rf: m.randomForest?.prAuc ?? 0, fmt: (n) => n.toFixed(3) },
+    { key: "precision", label: "Precision", logreg: m.logreg.precision, gbdt: m.gbdt.precision, rf: m.randomForest?.precision ?? 0, fmt: (n) => (n * 100).toFixed(1) + "%" },
+    { key: "recall", label: "Recall", logreg: m.logreg.recall, gbdt: m.gbdt.recall, rf: m.randomForest?.recall ?? 0, fmt: (n) => (n * 100).toFixed(1) + "%" },
+    { key: "f1", label: "F1", logreg: m.logreg.f1, gbdt: m.gbdt.f1, rf: m.randomForest?.f1 ?? 0, fmt: (n) => n.toFixed(3) },
+    { key: "accuracy", label: "Accuracy", logreg: m.logreg.accuracy, gbdt: m.gbdt.accuracy, rf: m.randomForest?.accuracy ?? 0, fmt: (n) => (n * 100).toFixed(1) + "%" },
+    { key: "brier", label: "Brier score", logreg: m.logreg.brierScore, gbdt: m.gbdt.brierScore, rf: m.randomForest?.brierScore ?? 0, fmt: (n) => n.toFixed(3) },
   ];
 
   const cm = m.confusionMatrix;
   const cmTotal = cm.tp + cm.fp + cm.fn + cm.tn;
   const topFeatures = m.featureImportance.slice(0, 15);
+  const hasRf = !!m.randomForest;
+  const hasCal = !!m.calibration;
+  const hasCv = !!m.crossValidation;
 
   return (
     <div className="space-y-4">
@@ -71,6 +74,24 @@ export function ModelInsightsView() {
         <StatTile label="Decision threshold" value={m.threshold.toFixed(2)} />
         <StatTile label="Avg alert lead time" value={`${m.leadTimeMin.toFixed(0)} min`} accent />
       </div>
+
+      {/* CV + calibration highlight row */}
+      {(hasCv || hasCal) && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {hasCv && (
+            <>
+              <StatTile label="5-fold CV ROC-AUC" value={`${m.crossValidation!.rocAucMean.toFixed(3)} ± ${m.crossValidation!.rocAucStd.toFixed(3)}`} accent />
+              <StatTile label="5-fold CV F1" value={m.crossValidation!.f1Mean.toFixed(3)} />
+            </>
+          )}
+          {hasCal && (
+            <>
+              <StatTile label="Calibration ECE" value={m.calibration!.ece.toFixed(3)} accent />
+              <StatTile label="Platt scaling" value={`a=${m.calibration!.plattA.toFixed(2)}, b=${m.calibration!.plattB.toFixed(2)}`} />
+            </>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* metrics table */}
@@ -87,6 +108,7 @@ export function ModelInsightsView() {
                   <th className="py-2 font-medium">Metric</th>
                   <th className="py-2 font-medium text-right">Log. Reg.</th>
                   <th className="py-2 font-medium text-right">GBDT</th>
+                  {hasRf && <th className="py-2 font-medium text-right">Rand. Forest</th>}
                 </tr>
               </thead>
               <tbody>
@@ -95,6 +117,7 @@ export function ModelInsightsView() {
                     <td className="py-2">{r.label}</td>
                     <td className="py-2 text-right text-muted-foreground">{r.fmt(r.logreg)}</td>
                     <td className="py-2 text-right font-semibold text-primary">{r.fmt(r.gbdt)}</td>
+                    {hasRf && <td className="py-2 text-right text-muted-foreground">{r.fmt(r.rf)}</td>}
                   </tr>
                 ))}
               </tbody>
@@ -216,6 +239,34 @@ export function ModelInsightsView() {
           </div>
         </CardContent>
       </Card>
+
+      {/* calibration curve */}
+      {hasCal && m.calibration!.curve.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <LineIcon className="h-4 w-4 text-primary" /> Calibration curve (Platt-scaled)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={m.calibration!.curve} margin={{ top: 5, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="predicted" domain={[0, 1]} stroke="var(--muted-foreground)" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(v) => v.toFixed(1)} />
+                  <YAxis domain={[0, 1]} stroke="var(--muted-foreground)" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={32} tickFormatter={(v) => v.toFixed(1)} />
+                  <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid var(--border)" }} formatter={(v: number, n: string) => [v.toFixed(3), n === "predicted" ? "Predicted" : "Observed"]} labelFormatter={() => ""} />
+                  <ReferenceLine segment={[{ x: 0, y: 0 }, { x: 1, y: 1 }]} stroke="var(--muted-foreground)" strokeDasharray="4 4" />
+                  <Line type="monotone" dataKey="observed" stroke="var(--chart-1)" strokeWidth={2} dot={{ r: 3 }} name="observed" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Expected Calibration Error (ECE) = <span className="font-semibold text-primary">{m.calibration!.ece.toFixed(3)}</span> · closer to the diagonal = better calibrated. A calibrated "70% risk" means 70 of 100 such patients actually spike.
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* plain language explanation */}
       <Card>

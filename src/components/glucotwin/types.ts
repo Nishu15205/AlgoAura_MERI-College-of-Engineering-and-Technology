@@ -105,6 +105,16 @@ export interface ModelMetricsData {
     accuracy: number;
     brierScore: number;
   };
+  randomForest?: {
+    name: string;
+    rocAuc: number;
+    prAuc: number;
+    precision: number;
+    recall: number;
+    f1: number;
+    accuracy: number;
+    brierScore: number;
+  };
   regression: {
     maeT30: number;
     maeT60: number;
@@ -117,6 +127,18 @@ export interface ModelMetricsData {
   rocCurve: { fpr: number; tpr: number }[];
   prCurve: { recall: number; precision: number }[];
   featureImportance: { feature: string; importance: number }[];
+  calibration?: {
+    ece: number;
+    curve: { predicted: number; observed: number; count: number }[];
+    plattA: number;
+    plattB: number;
+  };
+  crossValidation?: {
+    folds: { rocAuc: number; f1: number }[];
+    rocAucMean: number;
+    rocAucStd: number;
+    f1Mean: number;
+  };
   generatedAt: string;
   nPatients: number;
   nSamples: number;
