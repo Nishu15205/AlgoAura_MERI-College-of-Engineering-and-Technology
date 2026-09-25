@@ -2,102 +2,76 @@
 # GlucoTwin — dependency manifest
 # =============================================================================
 #
-# IMPORTANT — read this first.
-#
-# GlucoTwin was ORIGINALLY SPECCED as a Python / FastAPI backend serving a
-# React / Vite single-page frontend. The live demo environment for the
-# Happiest Health "Digital Twin Challenge 2026" exposes a single port (3000)
-# and a single user-visible route ("/"), which a two-process Python + Vite
-# stack cannot occupy. To preserve every functional requirement for the live
-# demo, GlucoTwin is IMPLEMENTED AS A SINGLE Next.js 16 + TypeScript
-# APPLICATION instead. Every required component has a 1:1 mapping:
+# GlucoTwin was originally designed as a Python / FastAPI backend serving a
+# React / Vite single-page frontend. For the Happiest Health "Digital Twin
+# Challenge 2026" live demo, the runtime exposes a single port (3000) and a
+# single user-visible route ("/"). To fit that constraint while preserving
+# every functional requirement, GlucoTwin is implemented as a single
+# Next.js 16 + TypeScript application. Every required component has a 1:1
+# mapping:
 #
 #   FastAPI route handlers  -> Next.js Route Handlers (src/app/api/**/route.ts)
-#   scikit-learn LogReg     -> src/lib/ml/logistic-regression.ts (from scratch)
-#   xgboost / lightgbm GBDT -> src/lib/ml/gbdt.ts (from scratch, histogram + Newton)
-#   shap TreeExplainer      -> GBDT.contributions() (Saabas, log-odds space)
-#   pandas / numpy          -> src/lib/ml/features.ts + src/lib/ml/stats.ts
-#   Synthetic data in Python-> src/lib/ml/data-generator.ts (fixed seed 20260117)
-#   React / Vite SPA        -> Next.js App Router client components
-#   Uvicorn / Gunicorn      -> Next.js dev server (port 3000)
+#   Pydantic models         -> TypeScript interfaces (src/lib/ml/types.ts)
+#   pandas / numpy          -> custom TS stats helpers (src/lib/ml/stats.ts)
+#   scikit-learn LogReg     -> src/lib/ml/logistic-regression.ts
+#   xgboost / lightgbm      -> src/lib/ml/gbdt.ts (histogram GBDT, from scratch)
+#   shap TreeExplainer      -> GBDT.contributions() (Saabas tree-interpreter)
+#   joblib model dumps      -> JSON model artifacts (ml/*.json)
+#   Uvicorn SSE stream      -> Next.js ReadableStream (src/app/api/stream/[id])
 #
-# Because the runtime is Node/TypeScript, the AUTHORITATIVE dependency list is
-# `package.json` (installed via `bun install`). This file is kept for two
-# reasons:
-#   1. It documents the original Python spec, so the project can be ported
-#      back to FastAPI + React/Vite in a standard two-process environment
-#      without re-deriving the dependency list.
-#   2. It lists the key npm dependencies alongside, so a reader scanning
-#      for "what does this project depend on" finds both stacks in one place.
-#
-# This is a research prototype on synthetic data. Not medical advice.
+# Below, the original Python stack (commented) is listed for portability, and
+# the authoritative npm dependency list follows. The package.json file is the
+# source of truth at runtime.
 # =============================================================================
 
+# -----------------------------------------------------------------------------
+# Original Python stack (for teams who want to port GlucoTwin back to FastAPI)
+# -----------------------------------------------------------------------------
+# fastapi==0.115.0
+# uvicorn[standard]==0.32.0
+# pydantic==2.9.0
+# pandas==2.2.3
+# numpy==2.1.0
+# scikit-learn==1.5.2
+# xgboost==2.1.1
+# shap==0.46.0
+# joblib==1.4.2
+# python-multipart==0.0.12
+# aiofiles==24.1.0
 
 # -----------------------------------------------------------------------------
-# A. ORIGINAL PYTHON SPEC (reference only — NOT installed in this environment)
-#     pip install -r <this section>
-#     (commented out so `pip install -r requirements.txt` is a no-op here;
-#      uncomment to port GlucoTwin back to FastAPI + React/Vite)
+# Authoritative runtime stack (Node / TypeScript) — see package.json
 # -----------------------------------------------------------------------------
+# Core framework
+next@^16.1.1
+react@^19.0.0
+react-dom@^19.0.0
+typescript@^5
 
-# fastapi==0.115.*           # API framework (replaced by Next.js Route Handlers)
-# uvicorn[standard]==0.32.*  # ASGI server (replaced by the Next.js dev server)
-# pydantic==2.*              # request/response validation (replaced by zod + TS types)
-# pandas==2.*                # data prep (replaced by src/lib/ml/features.ts)
-# numpy==2.*                 # numeric core (replaced by typed arrays + stats.ts)
-# scikit-learn==1.5.*        # LogisticRegression baseline + metrics
-#                            # (replaced by src/lib/ml/logistic-regression.ts + metrics.ts)
-# xgboost==2.*               # GBDT classifier + regressor
-#                            # (replaced by src/lib/ml/gbdt.ts, from scratch)
-# shap==0.46.*               # tree-interpreter explanations
-#                            # (replaced by GBDT.contributions(), Saabas in log-odds space)
-# joblib==1.4.*              # model persistence (replaced by JSON serialization)
-# prisma==0.15.*             # optional: Python Prisma client if porting the DB layer
+# UI / styling
+tailwindcss@^4
+@tailwindcss/postcss@^4
+lucide-react@^0.525.0
+recharts@^2.15.4
+framer-motion@^12.23.2
 
+# Database
+prisma@^6.11.1
+@prisma/client@^6.11.1
 
-# -----------------------------------------------------------------------------
-# B. ACTUAL RUNTIME STACK (Node / TypeScript) — `package.json` is authoritative
-#     Install with:  bun install
-#     (versions are pinned in package.json; the ranges below are indicative)
-# -----------------------------------------------------------------------------
+# State / data fetching
+@tanstack/react-query@^5.82.0
+zustand@^5.0.6
 
-# Runtime / framework
-# next@^16.1.1               # the App Router, Route Handlers, RSC, the dev server
-# react@^19                  # UI
-# react-dom@^19
+# Utilities
+date-fns@^4.1.0
+zod@^4.0.2
+clsx@^2.1.1
+tailwind-merge@^3.3.1
+sonner@^2.0.6
+uuid@^11.1.0
 
-# Data layer
-# prisma@^6.11.1             # schema, migrations, query builder
-# @prisma/client@^6.11.1    # generated ORM client (SQLite provider)
-
-# Dashboard UI
-# recharts@^2.15.4           # charts (glucose curve, ROC, PR, feature-importance bars)
-# lucide-react@^0.525.0      # icon set (teal/white medical theme)
-# tailwindcss@^4             # styling
-# @tailwindcss/postcss@^4    # tailwind PostCSS plugin
-# tailwindcss-animate@^1.0.7# animation utilities
-# tw-animate-css@^1.3.5      # additional animation helpers
-
-# Language / build / lint
-# typescript@^5              # the whole ML core is TS, including the GBDT
-# bun-types@^1.3.4           # Bun runtime types
-# eslint@^9                  # code quality (`bun run lint`)
-# eslint-config-next@^16.1.1# Next-specific lint rules
-
-# (Optional, already present via the scaffold but not load-bearing for GlucoTwin:)
-# zod, zustand, @tanstack/react-query, framer-motion, date-fns, sonner,
-# @radix-ui/* (shadcn/ui primitives used by the dashboard widgets)
-
-
-# =============================================================================
-# Quickstart (the commands that actually run GlucoTwin):
-#
-#   bun install
-#   bun run db:push          # create the SQLite schema
-#   bun run build:all        # generate synthetic data + train models + seed DB (~15s)
-#   bun run dev              # start the dashboard on http://localhost:3000
-#   bun run lint             # code quality
-#
-# All data, models, and metrics are reproducible from the fixed seed 20260117.
-# =============================================================================
+# Dev tooling
+eslint@^9
+eslint-config-next@^16.1.1
+bun-types@^1.3.4

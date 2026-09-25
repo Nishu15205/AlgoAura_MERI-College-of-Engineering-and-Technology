@@ -54,7 +54,6 @@ server.log
 /skills/
 
 # Local dev artifacts
-/worklog.md
 /.zscripts/
 /download/
 /upload/
