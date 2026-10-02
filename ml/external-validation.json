@@ -1,0 +1,74 @@
+{
+  "cohort": "Independent literature-calibrated (ICMR INDIAB demographics, Dexcom G6 noise)",
+  "nPatients": 60,
+  "nWindows": 3060,
+  "metrics": {
+    "rocAuc": 0.9415136825788463,
+    "prAuc": 0.4995251540749506,
+    "precision": 0.9916608756080612,
+    "recall": 0.9554737194509542,
+    "f1": 0.973231031543052,
+    "accuracy": 0.9486928104575163
+  },
+  "confusionMatrix": {
+    "tp": 2854,
+    "fp": 24,
+    "fn": 133,
+    "tn": 49
+  },
+  "cgmMetrics": {
+    "tir": 26.204530423280424,
+    "tar": 73.79546957671957,
+    "tarLevel2": 4.599041005291006,
+    "tbr": 0,
+    "tbrLevel2": 0,
+    "gmi": 8.06479464107147,
+    "cv": 13.947604582459839,
+    "meanGlucose": 198.77904017857318,
+    "sdGlucose": 27.724914516916357,
+    "glucoseManagementIndicator": 8.06479464107147
+  },
+  "samplePredictions": [
+    {
+      "patient": "Kiaan Mishra",
+      "prob": 0.964,
+      "band": "High"
+    },
+    {
+      "patient": "Shaurya Qureshi",
+      "prob": 0.973,
+      "band": "High"
+    },
+    {
+      "patient": "Riya Chauhan",
+      "prob": 0.974,
+      "band": "High"
+    },
+    {
+      "patient": "Tara Bhat",
+      "prob": 0.973,
+      "band": "High"
+    },
+    {
+      "patient": "Armaan Saxena",
+      "prob": 0.974,
+      "band": "High"
+    },
+    {
+      "patient": "Armaan Bhat",
+      "prob": 0.974,
+      "band": "High"
+    },
+    {
+      "patient": "Pranav Garg",
+      "prob": 0.974,
+      "band": "High"
+    },
+    {
+      "patient": "Anay Rastogi",
+      "prob": 0.974,
+      "band": "High"
+    }
+  ],
+  "generatedAt": "2026-09-25T09:01:35.418Z"
+}
