@@ -202,7 +202,7 @@ The what-if engine reuses the **same physiological model that generated the synt
 
 A **21-minute walkthrough and demo of GlucoTwin** is included in this repository at [`docs/GlucoTwin_Final_Video.mp4`](docs/GlucoTwin_Final_Video.mp4). It covers the motivation, the synthetic data pipeline, the model training results, a live tour of all five dashboard views (Patient List, Digital Twin, What-if Simulator, Model Insights, About), and the what-if simulation end-to-end.
 
-> The same recording is also being uploaded as an **unlisted YouTube video** for easier streaming; the link will be placed here: **[VIDEO_LINK]**
+> The same recording is also available as an **unlisted YouTube video** for easier streaming: **https://www.youtube.com/watch?v=LUcrP67LHn4**
 
 The demo script and the slide-by-slide breakdown live in [`docs/video_script.md`](docs/video_script.md) and [`docs/presentation_outline.md`](docs/presentation_outline.md).
 
@@ -211,6 +211,7 @@ The demo script and the slide-by-slide breakdown live in [`docs/video_script.md`
 | Deliverable | File |
 |---|---|
 | Demo video (21 min, mp4) | [`docs/GlucoTwin_Final_Video.mp4`](docs/GlucoTwin_Final_Video.mp4) |
+| Demo video (YouTube, unlisted) | https://www.youtube.com/watch?v=LUcrP67LHn4 |
 | Architecture diagram (PDF) | [`docs/GlucoTwin_Architecture.pdf`](docs/GlucoTwin_Architecture.pdf) |
 | Presentation (PPTX) | [`docs/GlucoTwin_Presentation.pptx`](docs/GlucoTwin_Presentation.pptx) |
 | Demo script | [`docs/video_script.md`](docs/video_script.md) |
