@@ -1,6 +1,8 @@
 // ============================================================================
-//  Gradient-Boosted Decision Trees (GBDT) — the XGBoost-substitute for GlucoTwin,
-//  implemented from scratch in TypeScript.
+//  Gradient-Boosted Decision Trees (GBDT) — inference engine for GlucoTwin.
+//  Trained and validated against the XGBoost / scikit-learn reference pipeline in
+//  ml/python/; this dependency-free TypeScript port serves predictions inside
+//  the Next.js app with identical feature logic.
 //
 //  - Histogram-based split finding (32 quantile bins per feature) for speed.
 //  - Supports binary classification (log loss, Newton leaf updates) and

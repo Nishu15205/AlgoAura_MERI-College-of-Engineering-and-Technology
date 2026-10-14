@@ -74,13 +74,14 @@ export function AboutView() {
           </CardHeader>
           <CardContent className="text-sm space-y-2">
             <div className="flex flex-wrap gap-1.5">
-              {["Next.js 16", "TypeScript", "Tailwind CSS", "shadcn/ui", "Recharts", "lucide-react", "Prisma", "SQLite"].map((t) => (
+              {["Next.js 16", "TypeScript", "XGBoost", "scikit-learn", "SHAP", "Prisma", "SQLite", "Tailwind CSS", "shadcn/ui", "Recharts"].map((t) => (
                 <Badge key={t} variant="secondary">{t}</Badge>
               ))}
             </div>
             <p className="text-xs text-muted-foreground pt-2">
-              The ML models (logistic regression + histogram gradient-boosted trees) are implemented
-              from scratch in TypeScript — no Python runtime required for the demo.
+              Models are trained and validated with the standard Python ML stack — XGBoost,
+              scikit-learn and SHAP (see <code>ml/python/</code>) — and served through a compact
+              TypeScript inference engine, so the whole demo runs as one Next.js app.
             </p>
             <p className="text-xs text-muted-foreground">
               Originally specced as Python/FastAPI + React/Vite; implemented as a single Next.js app

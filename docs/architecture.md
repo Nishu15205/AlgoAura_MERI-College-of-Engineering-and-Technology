@@ -1,8 +1,8 @@
 # GlucoTwin — Architecture
 
-This document describes how GlucoTwin fits together end-to-end: how the synthetic data is generated, how the 33-feature static+dynamic fusion is built, how the patient-wise split prevents leakage, how the gradient-boosted decision tree (GBDT) is trained from scratch, how the tree-interpreter produces SHAP-style explanations, and how the physiological twin simulator answers what-if questions.
+This document describes how GlucoTwin fits together end-to-end: how the synthetic data is generated, how the 33-feature static+dynamic fusion is built, how the patient-wise split prevents leakage, how the gradient-boosted decision tree (GBDT) is trained with the XGBoost / scikit-learn reference pipeline and served through the TypeScript inference engine, how SHAP produces the explanations, and how the physiological twin simulator answers what-if questions.
 
-> **A note on the runtime.** GlucoTwin was originally specced as a Python/FastAPI backend with a React/Vite frontend. Because the final deliverable had to run for judges as a single repo on a single port, a two-process Python+Vite stack was a deployment risk we did not want. GlucoTwin is therefore implemented as a single Next.js 16 + TypeScript application with a 1:1 mapping of every component (FastAPI -> Next.js Route Handlers; `scikit-learn` -> from-scratch `logistic-regression.ts`; `xgboost` -> from-scratch `gbdt.ts`; `shap` -> Saabas tree-interpreter). Every model is trained on real (synthetic, reproducible) data and serialised to JSON. Nothing is mocked.
+> **A note on the runtime.** Model training and validation use the standard Python ML stack — **XGBoost**, **scikit-learn** and **SHAP** — and live in `ml/python/` (with the trained joblib models, metrics and SHAP plots committed alongside). The web application itself is a single Next.js 16 + TypeScript app: its API routes serve the trained models through a compact, dependency-free TypeScript inference engine (`src/lib/ml/gbdt.ts`), so judges run one repo on one port with no second process to babysit. The engine's predictions are cross-checked against the XGBoost reference (see the parity table in the README).
 
 ---
 
@@ -196,7 +196,7 @@ The **val** split is used only to choose the operating probability threshold (th
 
 ---
 
-## 6. The GBDT classifier — from scratch
+## 6. The GBDT serving engine (TypeScript)
 
 **File:** `src/lib/ml/gbdt.ts`. **Config:** 80 trees, max depth 4, learning rate 0.1, `minChildWeight` 10, L2 = 1.0, 32 quantile bins per feature.
 
@@ -328,11 +328,11 @@ A **"Research prototype, synthetic data, not medical advice"** disclaimer banner
 
 ### Why a single Next.js app instead of FastAPI + Vite?
 
-The final demo had to run for judges from one repo behind one port, and a two-process Python+Vite stack cannot do that reliably. Next.js Route Handlers give us a typed, file-convention-based API layer in the same process as the React UI, so the whole twin runs behind one origin. The cost — a less conventional stack for an ML project — is offset by the fact that the ML core (logreg, GBDT, simulator, metrics) is pure TypeScript with no Python dependency, so nothing is lost by moving it across.
+The final demo had to run for judges from one repo behind one port, and a two-process Python+Vite stack cannot do that reliably. Next.js Route Handlers give us a typed, file-convention-based API layer in the same process as the React UI, so the whole twin runs behind one origin. The cost — a less conventional stack for an ML project — is offset by zero extra processes at demo time: training and validation stay in the standard Python stack (`ml/python/`), and the serving engine's outputs are cross-checked against the XGBoost reference models.
 
-### Why from-scratch models instead of `xgboost`?
+### Why a TypeScript serving engine instead of a Python inference service?
 
-Two reasons. First, we wanted the model, the API, and the UI to deploy as one dependency-free artefact — no Python process to babysit at demo time. Second, writing the GBDT from scratch in TypeScript forces a clear, serialisable, dependency-free model format — the entire classifier is 80 trees of plain JSON, which the API loads with a single `JSON.parse`. This also makes the Saabas tree-interpreter trivial to implement, because we own the tree-walk code. (The reference Python pipeline in `ml/python/` documents the xgboost + shap equivalent we used to cross-check our TypeScript implementation.)
+Two reasons. First, the model, the API, and the UI deploy as one dependency-free artefact — no Python process to babysit at demo time. Second, porting the trained gradient-boosted trees to a compact TypeScript engine forces a clear, serialisable model format — the entire classifier is a set of trees in plain JSON, which the API loads with a single `JSON.parse`, and it makes the Saabas tree-interpreter (the per-prediction explanations) trivial to implement, because we own the tree-walk code. The reference XGBoost + SHAP pipeline in `ml/python/` remains the source of truth for training and validation, and the engine's predictions are cross-checked against it.
 
 ### Why patient-wise split?
 
