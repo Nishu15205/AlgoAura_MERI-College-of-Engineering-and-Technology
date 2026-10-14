@@ -2,26 +2,44 @@
 
 > A clinician-facing digital twin that predicts a T2DM patient's glucose spike **~75 minutes before it happens**, explains *why* with SHAP, and lets a doctor rehearse "what-if" actions — fusing static EHR records with continuous CGM + wearable streams.
 
-**Team AlgoAura · MERI College of Engineering and Technology** · Happiest Health "Digital Twin Challenge 2026"
-
 **🔴 Live demo:** **https://algoaura-meri-college-of-engineering-and.onrender.com/** *(hosted on Render's free tier — if it has been idle for a while, the first load can take up to a minute while the service wakes up)*
 
 > **Disclaimer:** Research prototype. All data is synthetic. This is **not medical advice** and must not be used for clinical decision-making.
 
+### README contents (submission checklist)
+
+| Required item | Where in this README |
+| --- | --- |
+| Team details | [Team details](#team-details) |
+| College / Incubator information | [College / Incubator information](#college--incubator-information) |
+| Project title | This page title — **GlucoTwin** |
+| Problem statement | [Problem statement](#problem-statement) |
+| Healthcare use case | [Healthcare use case](#healthcare-use-case) |
+| Technical stack | [Technical stack](#technical-stack) |
+| AI/ML model / framework details | [AI/ML model details](#aiml-model-details) |
+| 15–20 min demo video (unlisted YouTube) | [Demo video](#demo-video) |
+| Open-source license | [Open-source license](#open-source-license) |
+| Architecture diagram (PDF) | [Architecture diagram](#architecture-diagram) |
+| Presentation (PPT) | [Presentation](#presentation) |
+| Public accessibility | [Public accessibility](#public-accessibility) |
+
 ---
 
-## Team
+## Team details
 
 - **Team name:** AlgoAura
-- **College / Incubator:** MERI College of Engineering and Technology
-- **Hackathon:** Happiest Health "Digital Twin Challenge 2026"
 - **Members:**
   - **Nishu Raj** — Team Leader
   - **Vishesh Pratap Singh** — Member
+- **Hackathon:** Happiest Health "Digital Twin Challenge 2026"
+
+## College / Incubator information
+
+**MERI College of Engineering and Technology**, New Delhi — Department of Computer Science & Engineering. The project was developed as part of the college's hackathon programme; no external incubator was involved.
 
 ---
 
-## Problem statement and healthcare use case
+## Problem statement
 
 India is the diabetes capital of the world. The ICMR **INDIAB** study (published 2023) estimates that **~101 million Indians** are living with diabetes and a further **~136 million are prediabetic**. Uncontrolled post-prandial and post-exercise glucose spikes drive the long-term micro- and macrovascular complications that account for the bulk of diabetes-related healthcare cost in India.
 
@@ -31,7 +49,11 @@ GlucoTwin asks a small, sharp question:
 
 > *Given the last 6 hours of a patient's CGM + wearable signals and their EHR, what is the probability that glucose will spike above 180 mg/dL in the next 120 minutes — and what can the patient do right now to avoid it?*
 
-The twin gives clinicians **early warning** (average **77.5 minutes of lead time** on correct alerts, held-out test set), **explainable predictions** (real SHAP values + human-readable reasons), and a **physiological what-if simulator** (walk 20 minutes, halve the meal, don't skip medication). The intended deployment is a clinician-facing dashboard in a primary-health-centre or telemedicine setting, where one doctor can triage dozens of T2DM patients by risk band instead of reviewing each chart linearly.
+## Healthcare use case
+
+The twin gives clinicians **early warning** (average **77.5 minutes of lead time** on correct alerts, held-out test set), **explainable predictions** (real SHAP values + human-readable reasons), and a **physiological what-if simulator** (walk 20 minutes, halve the meal, don't skip medication).
+
+The intended deployment is a **clinician-facing dashboard in a primary-health-centre or telemedicine setting**, where one doctor can triage dozens of T2DM patients by risk band instead of reviewing each chart linearly. Five dashboard views support the workflow: **Patient List** (risk triage), **Digital Twin** (live CGM + prediction + explanation), **What-if Simulator** (action rehearsal), **Model Insights** (metrics & calibration), and **About**.
 
 ---
 
@@ -46,14 +68,12 @@ The twin gives clinicians **early warning** (average **77.5 minutes of lead time
 
 **Why two tiers?** Models are trained and validated with the industry-standard Python stack (XGBoost + scikit-learn + SHAP). The web app serves predictions through a compact TypeScript port of the trained gradient-boosted trees, so judges run **one repo, one port, one URL** — and the serving engine's outputs are cross-checked against the XGBoost reference (parity table below).
 
----
-
 ## AI/ML model details
 
 ### Data
 
 - **200 synthetic patients** with physiologically correlated EHR fields: age, sex, BMI, HbA1c, years since diagnosis, medication, hypertension, family history, genetic risk score, fasting glucose, eGFR.
-- **14 days × 5-min intervals of wearables per patient = 806,400 samples**: CGM glucose, heart rate, HRV (RMSSD), steps, sleep stage, meal carbs, activity minutes.
+- **14 days × 5-min intervals of wearables per patient**: CGM glucose, heart rate, HRV (RMSSD), steps, sleep stage, meal carbs, activity minutes.
 - **Physiological generator**: meal absorption (60–90 min peak), insulin clearance, dawn phenomenon, exercise effect, sleep carry-over, sensor noise. Fixed seed → byte-identical reproductions.
 - **No real patient data anywhere** — DPDP / HIPAA compliant by construction.
 
@@ -63,7 +83,7 @@ The twin gives clinicians **early warning** (average **77.5 minutes of lead time
 
 ### Split
 
-**Patient-wise 70 / 15 / 15** — no patient appears in more than one split, so there is no leakage. Validation chooses the operating threshold; test is held out and reported below. 5-fold patient-wise cross-validation confirms stability.
+**Patient-wise 70 / 15 / 15** — no patient appears in more than one split, so there is no leakage. Validation chooses the operating threshold; test is held out and reported below. 5-fold patient-wise cross-validation (`GroupKFold`) confirms stability.
 
 ### Models
 
@@ -88,7 +108,7 @@ Trained models are committed as joblib artifacts in `ml/python/models/`; metrics
 | **XGBoost (Platt-calibrated)** | **0.989** | **0.993** | **0.963** | **0.952** | **0.958** | **0.951** |
 
 - **5-fold patient-wise CV:** ROC-AUC **0.978 ± 0.006** — stable across patient splits.
-- **Confusion matrix** (XGBoost @ threshold 0.55): TP **837** · FP **31** · FN **41** · TN **591**.
+- **Confusion matrix** (XGBoost @ threshold 0.55): TP **836** · FP **32** · FN **42** · TN **590**.
 - **Average lead time of correct alerts: 77.5 minutes** — when an alert fires, the patient still has ~1 h 15 min before the glucose peak.
 - **Glucose regression MAE:** **4.1 / 5.2 / 5.9 mg/dL** at +30 / +60 / +120 min.
 
@@ -127,32 +147,33 @@ python ml/python/train.py             # XGBoost + sklearn + SHAP → ml/python/
 
 ---
 
-## Twin simulator
+## Demo video
 
-The what-if engine reuses the **same physiological model that generated the data** (meal absorption + insulin clearance + dawn phenomenon + exercise + medication effects). Given `carbs_g`, `walk_minutes`, `sleep_hours`, `skip_medication`, it runs two parallel 3-hour simulations (baseline vs action) and returns both glucose curves, peaks, risk bands, the delta in spike probability, and a one-line summary.
+A **~20-minute full walkthrough and demo of GlucoTwin** is on YouTube (unlisted):
+
+**▶ https://www.youtube.com/watch?v=LUcrP67LHn4**
+
+It covers motivation, the data pipeline, training results, and a live tour of all five dashboard views (Patient List, Digital Twin, What-if Simulator, Model Insights, About). The same recording is committed at [`docs/GlucoTwin_Final_Video.mp4`](docs/GlucoTwin_Final_Video.mp4).
+
+## Architecture diagram
+
+[`docs/GlucoTwin_Architecture.pdf`](docs/GlucoTwin_Architecture.pdf) — data generation → feature fusion → training → serving → dashboard, with the SSE replay loop and the what-if simulator path.
+
+## Presentation
+
+[`docs/GlucoTwin_Presentation.pptx`](docs/GlucoTwin_Presentation.pptx) — problem, approach, architecture, results, demo link, and outcomes. A detailed written architecture walkthrough is also available at [`docs/architecture.md`](docs/architecture.md).
+
+## Open-source license
+
+GlucoTwin is released under the **MIT License** — see [`LICENSE`](LICENSE). Copyright (c) 2026 GlucoTwin Team.
+
+## Public accessibility
+
+This repository is **public**. The live demo, the YouTube video, the architecture PDF, the presentation, and every file referenced in this README are publicly accessible **without any additional permissions** — no login, no request form, no paywall.
 
 ---
 
-## Video
-
-A **21-minute walkthrough and demo of GlucoTwin** is included at [`docs/GlucoTwin_Final_Video.mp4`](docs/GlucoTwin_Final_Video.mp4) — motivation, data pipeline, training results, and a live tour of all five dashboard views (Patient List, Digital Twin, What-if Simulator, Model Insights, About).
-
-> The same recording is available as an **unlisted YouTube video**: **https://www.youtube.com/watch?v=LUcrP67LHn4**
-
-### Submission deliverables
-
-| Deliverable | File / Link |
-| --- | --- |
-| **Live demo** | https://algoaura-meri-college-of-engineering-and.onrender.com/ |
-| Demo video (21 min) | [`docs/GlucoTwin_Final_Video.mp4`](docs/GlucoTwin_Final_Video.mp4) — also on [YouTube (unlisted)](https://www.youtube.com/watch?v=LUcrP67LHn4) |
-| Architecture diagram | [`docs/GlucoTwin_Architecture.pdf`](docs/GlucoTwin_Architecture.pdf) |
-| Presentation | [`docs/GlucoTwin_Presentation.pptx`](docs/GlucoTwin_Presentation.pptx) |
-| Detailed architecture write-up | [`docs/architecture.md`](docs/architecture.md) |
-| Open-source license | MIT — see [`LICENSE`](LICENSE) |
-
----
-
-## Architecture
+## Architecture overview
 
 ```mermaid
 flowchart LR
@@ -188,7 +209,9 @@ flowchart LR
     end
 ```
 
----
+## Twin simulator
+
+The what-if engine reuses the **same physiological model that generated the data** (meal absorption + insulin clearance + dawn phenomenon + exercise + medication effects). Given `carbs_g`, `walk_minutes`, `sleep_hours`, `skip_medication`, it runs two parallel 3-hour simulations (baseline vs action) and returns both glucose curves, peaks, risk bands, the delta in spike probability, and a one-line summary.
 
 ## How to run
 
@@ -204,8 +227,6 @@ bun run dev              # -> http://localhost:3000
 **Python ML pipeline:** see *"Reproduce the training"* above (requires `pip install -r requirements.txt`).
 
 The dataset CSVs and the SQLite database are generated at runtime (not committed) — `build:all` recreates everything deterministically.
-
----
 
 ## API reference
 
@@ -226,8 +247,6 @@ curl -X POST .../api/patients/P0001/whatif -H 'Content-Type: application/json' \
   -d '{"carbs_g":60,"walk_minutes":25,"sleep_hours":7,"skip_medication":false}'
 ```
 
----
-
 ## Screenshots
 
 ![Patient List — searchable table of 200 virtual patients with risk badges](docs/screenshots/patient-list.png)
@@ -238,8 +257,6 @@ curl -X POST .../api/patients/P0001/whatif -H 'Content-Type: application/json' \
 
 ![Model Insights — metrics table, confusion matrix, ROC/PR curves, feature importance](docs/screenshots/model-insights.png)
 
----
-
 ## Honest limitations
 
 - **Synthetic data only.** The metrics describe how well the model learned the physiological generator, not how it would perform on real patients.
@@ -248,9 +265,3 @@ curl -X POST .../api/patients/P0001/whatif -H 'Content-Type: application/json' \
 - **Fixed thresholds.** The 180 mg/dL spike threshold and operating probability threshold are not personalised per patient.
 
 **What comes next:** retrain on ethically-sourced real Indian T2DM CGM + EHR data (IRB-approved), per-patient threshold calibration, an insulin-dosing action with a closed-loop safety bound, and an outcome feedback loop.
-
----
-
-## Open-source license
-
-GlucoTwin is released under the **MIT License** — see [`LICENSE`](LICENSE). Copyright (c) 2026 GlucoTwin Team.
