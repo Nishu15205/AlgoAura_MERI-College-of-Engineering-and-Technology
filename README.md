@@ -204,18 +204,13 @@ A **21-minute walkthrough and demo of GlucoTwin** is included in this repository
 
 > The same recording is also available as an **unlisted YouTube video** for easier streaming: **https://www.youtube.com/watch?v=LUcrP67LHn4**
 
-The demo script and the slide-by-slide breakdown live in [`docs/video_script.md`](docs/video_script.md) and [`docs/presentation_outline.md`](docs/presentation_outline.md).
-
 ### Submission deliverables
 
 | Deliverable | File |
 |---|---|
-| Demo video (21 min, mp4) | [`docs/GlucoTwin_Final_Video.mp4`](docs/GlucoTwin_Final_Video.mp4) |
-| Demo video (YouTube, unlisted) | https://www.youtube.com/watch?v=LUcrP67LHn4 |
+| Demo video (21 min, mp4) | [`docs/GlucoTwin_Final_Video.mp4`](docs/GlucoTwin_Final_Video.mp4) — also on [YouTube (unlisted)](https://www.youtube.com/watch?v=LUcrP67LHn4) |
 | Architecture diagram (PDF) | [`docs/GlucoTwin_Architecture.pdf`](docs/GlucoTwin_Architecture.pdf) |
 | Presentation (PPTX) | [`docs/GlucoTwin_Presentation.pptx`](docs/GlucoTwin_Presentation.pptx) |
-| Demo script | [`docs/video_script.md`](docs/video_script.md) |
-| Slide outline | [`docs/presentation_outline.md`](docs/presentation_outline.md) |
 | Detailed architecture write-up | [`docs/architecture.md`](docs/architecture.md) |
 
 ---
@@ -371,8 +366,6 @@ GlucoTwin/
     feature-names.json               # the 33-feature contract
   docs/
     architecture.md                  # detailed architecture write-up
-    video_script.md                  # 3-minute demo script
-    presentation_outline.md          # 10-12 slide deck outline
     screenshots/                     # (drop screenshots here)
 ```
 
