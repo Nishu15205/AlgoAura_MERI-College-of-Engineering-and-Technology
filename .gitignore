@@ -27,7 +27,9 @@ server.log
 next-env.d.ts
 
 # generated at runtime (recreate with `bun run build:all`)
-/db/
+# keep the folder itself in git (with .gitkeep) so SQLite can open db/custom.db on fresh clones
+/db/*
+!/db/.gitkeep
 
 # large local files that don't belong in git
 /upload/
