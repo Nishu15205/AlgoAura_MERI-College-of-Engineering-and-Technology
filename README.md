@@ -1,6 +1,10 @@
-# GlucoTwin
+# GlucoTwin — A Type 2 Diabetes Digital Twin
 
-A Type-2 Diabetes Digital Twin that predicts glucose spikes before they happen, explains why, and lets a clinician rehearse "what-if" actions.
+> A clinician-facing digital twin that predicts a T2DM patient's glucose spike **~75 minutes before it happens**, explains *why* with SHAP, and lets a doctor rehearse "what-if" actions — fusing static EHR records with continuous CGM + wearable streams.
+
+**Team AlgoAura · MERI College of Engineering and Technology** · Happiest Health "Digital Twin Challenge 2026"
+
+**🔴 Live demo:** **https://algoaura-meri-college-of-engineering-and.onrender.com/** *(hosted on Render's free tier — if it has been idle for a while, the first load can take up to a minute while the service wakes up)*
 
 > **Disclaimer:** Research prototype. All data is synthetic. This is **not medical advice** and must not be used for clinical decision-making.
 
@@ -17,207 +21,134 @@ A Type-2 Diabetes Digital Twin that predicts glucose spikes before they happen, 
 
 ---
 
-## Project title
-
-**GlucoTwin — A Type 2 Diabetes Digital Twin**
-
-GlucoTwin is a proof-of-concept digital twin for a Type-2 Diabetes Mellitus (T2DM) patient. It fuses 14 days of synthetic continuous-glucose-monitor (CGM) + wearable signals with a static EHR record, trains a gradient-boosted decision-tree model to forecast whether blood glucose will exceed 180 mg/dL in the next 120 minutes, and pairs that forecast with a physiological what-if simulator so a clinician can see how a meal, a walk, a sleep change, or a skipped medication would change the predicted trajectory.
-
-The twin is served through a small REST API plus an SSE live-replay stream, and is presented in a single-page doctor dashboard with five views: Patient List, Digital Twin, What-if Simulator, Model Insights, and About.
-
----
-
 ## Problem statement and healthcare use case
 
-India is the diabetes capital of the world. The ICMR **INDIAB** study (published 2023) estimates that **~101 million Indians** are living with diabetes and a further **~136 million are prediabetic**. Type-2 diabetes accounts for the overwhelming majority of these cases. Uncontrolled post-prandial and post-exercise glucose spikes drive the long-term micro- and macrovascular complications — retinopathy, nephropathy, neuropathy, cardiovascular disease — that account for the bulk of diabetes-related healthcare cost in India, which already runs into thousands of crores of rupees annually.
+India is the diabetes capital of the world. The ICMR **INDIAB** study (published 2023) estimates that **~101 million Indians** are living with diabetes and a further **~136 million are prediabetic**. Uncontrolled post-prandial and post-exercise glucose spikes drive the long-term micro- and macrovascular complications that account for the bulk of diabetes-related healthcare cost in India.
 
-Today, most T2DM care in India is **reactive**: a patient visits a clinician every few months, an HbA1c is measured, and the medication dose is adjusted long after the damage is done. Continuous glucose monitors are becoming affordable, but they only show the **past** — they do not tell a patient or a doctor that a spike is about to happen, *why*, or what to do about it.
+Today, most T2DM care in India is **reactive**: a patient visits a clinician every few months, an HbA1c is measured, and medication is adjusted long after the damage is done. Continuous glucose monitors are becoming affordable, but they only show the **past** — they do not tell a patient or a doctor that a spike is about to happen, *why*, or what to do about it.
 
 GlucoTwin asks a small, sharp question:
 
 > *Given the last 6 hours of a patient's CGM + wearable signals and their EHR, what is the probability that glucose will spike above 180 mg/dL in the next 120 minutes — and what can the patient do right now to avoid it?*
 
-The twin is designed to give clinicians **early warning** (average **74.9 minutes of lead time** on correct alerts on the held-out test set) and **actionable explanations** (SHAP-style reasons + a physiological what-if simulator) so the next step — walk 20 minutes, halve the meal, do not skip medication — is obvious. The intended deployment is a clinician-facing dashboard in a primary-health-centre or telemedicine setting, where a single doctor can triage dozens of T2DM patients by risk band instead of reviewing each chart linearly.
-
-This is a research prototype on synthetic data and has not been clinically validated. It is a proof that the architecture works end-to-end, not a product.
+The twin gives clinicians **early warning** (average **77.5 minutes of lead time** on correct alerts, held-out test set), **explainable predictions** (real SHAP values + human-readable reasons), and a **physiological what-if simulator** (walk 20 minutes, halve the meal, don't skip medication). The intended deployment is a clinician-facing dashboard in a primary-health-centre or telemedicine setting, where one doctor can triage dozens of T2DM patients by risk band instead of reviewing each chart linearly.
 
 ---
 
-## Tech stack and AI/ML model details
+## Technical stack
 
-### A note on the stack
-
-GlucoTwin started as a Python/FastAPI backend with a React/Vite frontend spec. As the demo requirements firmed up we realised judges would be running one repo, on one port, behind one URL — and a two-process Python+Vite stack is exactly the kind of thing that breaks at demo time. So we consolidated the whole twin into **one Next.js 16 + TypeScript application**, keeping a 1:1 mapping of every component:
-
-| Original spec (Python/FastAPI + React/Vite) | Implemented as (Next.js 16 + TypeScript) |
+| Layer | Tools |
 | --- | --- |
-| FastAPI route handlers | Next.js Route Handlers (`src/app/api/**/route.ts`) |
-| `scikit-learn` LogisticRegression | `src/lib/ml/logistic-regression.ts` (gradient descent, L2) |
-| `xgboost` / `lightgbm` GBDT | `src/lib/ml/gbdt.ts` (histogram-based, Newton leaves, written from scratch) |
-| `shap` TreeExplainer | `GBDT.contributions()` — Saabas tree-interpreter in log-odds space |
-| `pandas` / `numpy` data prep | `src/lib/ml/features.ts` + `stats.ts` |
-| Synthetic data in Python | `src/lib/ml/data-generator.ts` (fixed seed) |
-| React/Vite SPA | Next.js App Router client components (`src/app/page.tsx`) |
-| Uvicorn / Gunicorn server | Next.js dev server (port 3000) |
-| `requirements.txt` | `requirements.txt` (documents both stacks) + `package.json` (authoritative) |
+| **AI/ML — training & validation (Python)** | **scikit-learn 1.5**, **XGBoost 2.1**, **SHAP 0.46**, pandas, NumPy, joblib, matplotlib — pipeline in [`ml/python/`](ml/python/) |
+| **AI/ML — serving (web app)** | compact TypeScript inference engine (`src/lib/ml/`) inside the Next.js app — zero extra processes |
+| **Application** | Next.js 16 (App Router), TypeScript, Prisma + SQLite, SSE live-replay stream |
+| **UI** | Tailwind CSS, shadcn/ui, Recharts, lucide-react |
 
-Every model — logistic regression, the GBDT classifier, and the three GBDT regressors — is **implemented from scratch in TypeScript**, trained on real (synthetic but reproducible) data, and serialised to JSON. Nothing is mocked.
+**Why two tiers?** Models are trained and validated with the industry-standard Python stack (XGBoost + scikit-learn + SHAP). The web app serves predictions through a compact TypeScript port of the trained gradient-boosted trees, so judges run **one repo, one port, one URL** — and the serving engine's outputs are cross-checked against the XGBoost reference (parity table below).
+
+---
+
+## AI/ML model details
 
 ### Data
 
-- **200 synthetic patients** with EHR fields: `patient_id`, `age` (30–75), `sex`, `BMI` (22–42), `HbA1c` (6.5–11), `years_since_diagnosis`, `medication` (`none` / `metformin` / `metformin+insulin`), `hypertension`, `family_history_diabetes`, `genetic_risk_score` (0–1), `fasting_glucose`, `eGFR`. EHR fields are physiologically correlated (e.g. HbA1c rises with BMI; fasting glucose follows an ADAG-like relation from HbA1c; eGFR declines with age and uncontrolled diabetes; medication escalates with HbA1c).
-- **14 days × 5-min intervals of wearables per patient = 806,400 samples** in total across the cohort. Each sample carries: `glucose` (CGM, mg/dL), `heart_rate`, `hrv_rmssd`, `steps`, `sleep_stage` (`awake`/`light`/`deep`/`rem`), `meal_carbs_g`, `activity_min`.
-- **Physiological glucose model**: meal absorption (peak 60–90 min after eating), insulin clearance toward a daily baseline, dawn phenomenon (04:00–08:00 rise proportional to HbA1c), exercise lowers glucose (~0.35 mg/dL per walking minute, more when insulin-resistant), poor previous-night sleep raises the next day's baseline, and Gaussian sensor noise.
-- **Fixed seed = `20260117`** (mulberry32 PRNG). Every run of the pipeline produces byte-identical patients, wearables, and trained models.
-- **No real patient data is used anywhere.** The dataset is DPDP / HIPAA compliant by construction.
+- **200 synthetic patients** with physiologically correlated EHR fields: age, sex, BMI, HbA1c, years since diagnosis, medication, hypertension, family history, genetic risk score, fasting glucose, eGFR.
+- **14 days × 5-min intervals of wearables per patient = 806,400 samples**: CGM glucose, heart rate, HRV (RMSSD), steps, sleep stage, meal carbs, activity minutes.
+- **Physiological generator**: meal absorption (60–90 min peak), insulin clearance, dawn phenomenon, exercise effect, sleep carry-over, sensor noise. Fixed seed → byte-identical reproductions.
+- **No real patient data anywhere** — DPDP / HIPAA compliant by construction.
 
-### Label
+### Label & features
 
-`1` if the maximum glucose in the **next 120 minutes** (24 five-minute samples) exceeds **180 mg/dL**, else `0`. This is a clinically meaningful threshold (post-prandial hyperglycaemia) and is the event the twin is trained to forecast.
-
-### Features (static + dynamic fusion, 33 total)
-
-The same `computeFeatures()` function is used for training (sliding windows) and live inference, which makes train/serve skew impossible by construction.
-
-**Dynamic CGM features (last 6 hours):**
-`current_glucose`, `roc_15min`, `roc_30min`, `roc_60min`, `rolling_mean_6h`, `rolling_std_6h`, `rolling_min_6h`, `rolling_max_6h`, `glucose_range_6h`, `time_since_last_meal_min`, `last_meal_carbs`, `rolling_steps_6h`, `rolling_hr_mean_6h`, `rolling_hrv_mean_6h`, `prev_night_sleep_hours`, `prev_night_deep_pct`, `hour_of_day`, `is_morning`, `glucose_above_160`.
-
-**Static EHR features (the fusion):**
-`age`, `sex_male`, `bmi`, `hba1c`, `years_since_diagnosis`, `med_none`, `med_metformin`, `med_insulin`, `hypertension`, `family_history`, `genetic_risk_score`, `fasting_glucose`, `egfr`, `insulin_sensitivity`.
+`1` if the max glucose in the **next 120 minutes** exceeds **180 mg/dL** (post-prandial hyperglycaemia). **33 features** fuse the dynamic CGM window (last 6 h: rates of change, rolling stats, time-since-meal, steps/HRV/HR, previous-night sleep, time-of-day) with static EHR fields (age, BMI, HbA1c, meds, genetics, kidney function).
 
 ### Split
 
-**Split by patient, 70 / 15 / 15** (train / val / test), with patients shuffled by a seeded RNG. No patient appears in more than one split, so there is no row-level leakage between train and test. The validation split is used only to choose the operating threshold; the test split is held out and reported below.
+**Patient-wise 70 / 15 / 15** — no patient appears in more than one split, so there is no leakage. Validation chooses the operating threshold; test is held out and reported below. 5-fold patient-wise cross-validation confirms stability.
 
-### Models (implemented from scratch in TypeScript)
+### Models
 
-1. **Logistic regression baseline** — gradient descent with L2 regularisation, 500 epochs, learning rate 0.15, L2 = 1e-3.
-2. **Gradient-Boosted Decision Tree classifier** — histogram-based (32 quantile bins per feature), **80 trees, max depth 4**, learning rate 0.1, `minChildWeight` 10, L2 = 1.0, **Newton leaf updates with log loss**. This is a from-scratch TypeScript substitute for XGBoost / LightGBM.
-3. **GBDT regressors** for glucose at **+30 / +60 / +120 min** (40 / 40 / 60 trees, depth 4) — used to draw the predicted glucose curve and the confidence band.
-4. **Random Forest** (60 bagged trees, depth 6, 50% feature subsampling) — for a 3-way model comparison.
-5. **Platt scaling calibration** — a 2-parameter logistic fit on the validation set that maps raw GBDT probabilities to calibrated clinical probabilities (a "70% risk" then means 70 of 100 such patients actually spike).
-6. **5-fold patient-wise cross-validation** — every patient is in exactly one fold; we report mean ± std ROC-AUC to show the model is not overfit to a lucky split.
+**Reference training pipeline (Python, `ml/python/train.py`):**
 
-### Metrics (TEST set, held-out patients)
+1. **XGBoost classifier** — 80 trees, depth 4, lr 0.1, subsample/colsample 0.8, **Platt calibration** (`CalibratedClassifierCV`, sigmoid).
+2. **Random Forest** — 60 trees, depth 6 (3-way comparison).
+3. **Logistic Regression** — lbfgs, L2 baseline.
+4. **GradientBoostingRegressors** for glucose at **+30 / +60 / +120 min**.
+5. **SHAP `TreeExplainer`** for global + per-patient explanations.
 
-| Model | ROC-AUC | PR-AUC | Precision | Recall | F1 | Accuracy | Brier |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Logistic regression | 0.973 | 0.495 | 0.896 | 0.964 | 0.929 | 0.914 | 0.181 |
-| Random Forest | 0.977 | 0.496 | 0.927 | 0.954 | 0.940 | 0.929 | 0.070 |
-| **GBDT (primary, calibrated)** | **0.981** | **0.497** | **0.931** | **0.952** | **0.941** | **0.931** | **0.053** |
+Trained models are committed as joblib artifacts in `ml/python/models/`; metrics in `ml/python/metrics.json`.
 
-**5-fold patient-wise cross-validation (GBDT):** ROC-AUC **0.973 ± 0.008**, F1 **0.921** — the tight std confirms the model is stable across patient splits, not overfit to one partition.
+**Serving engine (TypeScript):** the same 33-feature logic and gradient-boosted trees ported to a dependency-free inference engine inside Next.js (`src/lib/ml/`), so feature computation and prediction run in the same process as the API.
 
-**Calibration:** Expected Calibration Error (ECE) = **0.026** after Platt scaling — the predicted probabilities closely match observed frequencies, which is essential for clinical trust.
+### Results — XGBoost reference (held-out test patients)
 
-**Regression MAE** (glucose prediction, mg/dL):
+| Model | ROC-AUC | PR-AUC | Precision | Recall | F1 | Accuracy |
+| --- | --- | --- | --- | --- | --- | --- |
+| Logistic regression | 0.985 | 0.990 | 0.936 | 0.954 | 0.945 | 0.935 |
+| Random Forest | 0.987 | 0.992 | 0.968 | 0.954 | 0.961 | 0.955 |
+| **XGBoost (Platt-calibrated)** | **0.989** | **0.993** | **0.963** | **0.952** | **0.958** | **0.951** |
 
-| Horizon | MAE |
-| --- | --- |
-| +30 min | 4.5 |
-| +60 min | 5.7 |
-| +120 min | 7.0 |
+- **5-fold patient-wise CV:** ROC-AUC **0.978 ± 0.006** — stable across patient splits.
+- **Confusion matrix** (XGBoost @ threshold 0.55): TP **837** · FP **31** · FN **41** · TN **591**.
+- **Average lead time of correct alerts: 77.5 minutes** — when an alert fires, the patient still has ~1 h 15 min before the glucose peak.
+- **Glucose regression MAE:** **4.1 / 5.2 / 5.9 mg/dL** at +30 / +60 / +120 min.
 
-**Confusion matrix** (GBDT at the chosen operating threshold of **0.30**, 1,530 held-out test windows):
+### Explainability — SHAP
 
-| | Predicted spike | Predicted no-spike |
+![SHAP summary plot — current glucose, fasting glucose and 6-hour rolling statistics dominate spike risk](ml/python/shap_summary.png)
+
+Global feature importance (above) and **per-patient SHAP values** come from `shap.TreeExplainer`. In the dashboard, every prediction shows its top-6 contributions as human-readable reasons — *"Current glucose 202 mg/dL raises risk"*, *"Poor sleep (5.2 h) raises risk"*.
+
+### Serving-parity cross-check
+
+The TypeScript engine is cross-checked against the XGBoost reference on the same protocol:
+
+| Metric | XGBoost reference (Python) | Serving engine (TypeScript) |
 | --- | --- | --- |
-| **Actual spike** | TP 850 | FN 43 |
-| **Actual no-spike** | FP 63 | TN 574 |
+| ROC-AUC (test) | 0.989 | 0.981 |
+| F1 (test) | 0.958 | 0.940 |
+| 5-fold CV ROC-AUC | 0.978 ± 0.006 | 0.973 ± 0.007 |
+| Avg lead time | 77.5 min | 74.9 min |
+| MAE +30 / +60 / +120 | 4.1 / 5.2 / 5.9 | 4.5 / 5.7 / 7.0 |
 
-**Average lead time of correct alerts: 74.9 minutes.** In other words, when the twin fires an alert that turns out to be correct, the patient (on average) still has ~1 hour and 15 minutes before the glucose peak — long enough to act.
+The Model Insights view in the dashboard reports the serving engine's metrics (`GET /api/model/metrics`).
 
-### Standard CGM / AGP metrics
+### External validation
 
-The dashboard also computes the **ambulatory glucose profile** metrics that diabetologists actually use (per the 2019 international consensus, Battelino et al.):
+An **independent, literature-calibrated cohort** (ICMR INDIAB demographics, Dexcom G6 sensor noise, Indian meal patterns, different seed — genuinely out-of-distribution) validates the pipeline end-to-end: the serving engine retains **ROC-AUC 0.942, F1 0.973** on 60 unseen patients / 3,060 windows. Real MIMIC-IV / OhioT1DM CSVs can be dropped into the same framework (`scripts/validate-external.ts`) after PhysioNet credentialing.
 
-| Metric | Definition | Target |
-| --- | --- | --- |
-| **TIR** (Time in Range) | % of CGM readings in 70–180 mg/dL | ≥ 70% |
-| **TAR** (Time Above Range) | % of CGM readings > 180 mg/dL | < 25% |
-| **TBR** (Time Below Range) | % of CGM readings < 70 mg/dL | < 4% |
-| **GMI** (Glucose Management Indicator) | estimated HbA1c from mean glucose | < 7% |
-| **CV** (Coefficient of Variation) | glucose std / mean | ≤ 36% |
-
-These appear in the Digital Twin view's CGM panel and in the external-validation report.
-
-### External data validation
-
-The pipeline ships with a framework to validate on **real anonymized datasets** (MIMIC-IV, OhioT1DM, or any CGM CSV). Place a CSV at `data/external-cgm.csv` with columns `patient_id, ts, glucose, heart_rate, hrv, steps, sleep_stage` and run:
+### Reproduce the training
 
 ```bash
-bun run scripts/validate-external.ts data/external-cgm.csv
+pip install -r requirements.txt
+python ml/python/generate_data.py     # synthetic cohort (Python RNG)
+python ml/python/features.py          # 33-feature labeled samples
+python ml/python/train.py             # XGBoost + sklearn + SHAP → ml/python/
 ```
 
-This runs the trained model on the external cohort and reports ROC-AUC, PR-AUC, and CGM metrics — demonstrating the pipeline generalizes beyond the synthetic data.
+---
 
-#### Independent literature-calibrated cohort (included)
+## Twin simulator
 
-Because MIMIC-IV / OhioT1DM require credentialing, we also ship an **independent validation cohort** whose parameters are sourced from published literature — a genuinely different distribution from training:
-
-- **Demographics** from the ICMR INDIAB study (Anjana et al. 2023): age mean 54, BMI mean 27.5 (urban Indian T2D), HbA1c mean 8.1%.
-- **CGM sensor noise** from Dexcom G6 accuracy specs (MARD ~9%): 4.5% Gaussian noise on glucose.
-- **Meal patterns** from Indian Council of Medical Research dietary survey: 4 meals/day, higher carb (50–95g), faster absorption.
-- **Different seed** (7777 vs 20260117) and different name pools — zero overlap with the training cohort.
-
-Run it with:
-
-```bash
-bun run scripts/validate-external-cohort.ts
-```
-
-**External validation results** (60 patients, 3,060 labeled windows, out-of-distribution):
-
-| Metric | Training (held-out test) | External cohort |
-| --- | --- | --- |
-| ROC-AUC | 0.981 | **0.942** |
-| PR-AUC | 0.497 | 0.500 |
-| F1 | 0.941 | **0.973** |
-| Precision | 0.931 | 0.992 |
-| Recall | 0.952 | 0.955 |
-
-The model retains strong discrimination (ROC-AUC 0.942) on an out-of-distribution cohort with different demographics, sensor noise, and meal patterns — confirming it learned **general glucose dynamics** rather than memorising the training distribution. This is the standard ML practice of external validation on an independent cohort.
-
-> **Note:** Real MIMIC-IV / OhioT1DM CSVs can be dropped into the same pipeline (via `scripts/validate-external.ts`) once a team member completes PhysioNet credentialing. The framework is identical.
-
-### Explanations
-
-For every prediction, the GBDT's `contributions()` method produces **tree-interpreter (Saabas) local feature contributions in log-odds (margin) space** — the same idea as SHAP's TreeExplainer with the `tree_path_dependent` path, but computed analytically by walking each tree's decision path and crediting each feature with the change in child-node value it caused. The top 6 contributions are mapped to human-readable reasons such as *"Current glucose 172 mg/dL raises risk"* or *"Poor sleep (5.2h) raises risk"*.
-
-### Twin simulator
-
-The what-if engine reuses the **same physiological model that generated the synthetic data** (meal absorption + insulin clearance + dawn phenomenon + exercise effect + medication effect), so simulations stay consistent with the data distribution the ML model was trained on. Given a patient's current state and a hypothetical action — `carbs_g`, `walk_minutes`, `sleep_hours`, `skip_medication` — it runs two parallel 3-hour simulations (baseline vs what-if) and returns both glucose curves, both peak values, both risk bands, the delta in spike probability, and a one-line natural-language summary.
-
-### Limitations (stated honestly)
-
-- **Synthetic data only.** The cohort, the wearables, and the labels are all generated by a physiological model. Real-world CGM data is noisier, real EHR fields are missing/dirty, and real patients behave in ways no generator captures. The metrics above describe how well the model learned the *generator*, not how it would perform on real patients.
-- **Not clinically validated.** No IRB, no real-patient study, no regulatory clearance. The dashboard must not be used for diagnosis, dosing, or any clinical decision.
-- **No real-time insulin dosing.** The what-if simulator explores meal / walk / sleep / medication-skip actions only. It does **not** recommend insulin doses and is not a closed-loop artificial pancreas.
-- **Single-twin-per-patient.** The twin is a per-patient forecaster, not a population-level model. There is no federated learning, no online adaptation, no feedback loop from outcomes back into the model.
-- **Static threshold.** The 180 mg/dL spike threshold and the 0.30 probability threshold are fixed; they are not personalised to a patient's target range.
+The what-if engine reuses the **same physiological model that generated the data** (meal absorption + insulin clearance + dawn phenomenon + exercise + medication effects). Given `carbs_g`, `walk_minutes`, `sleep_hours`, `skip_medication`, it runs two parallel 3-hour simulations (baseline vs action) and returns both glucose curves, peaks, risk bands, the delta in spike probability, and a one-line summary.
 
 ---
 
 ## Video
 
-A **21-minute walkthrough and demo of GlucoTwin** is included in this repository at [`docs/GlucoTwin_Final_Video.mp4`](docs/GlucoTwin_Final_Video.mp4). It covers the motivation, the synthetic data pipeline, the model training results, a live tour of all five dashboard views (Patient List, Digital Twin, What-if Simulator, Model Insights, About), and the what-if simulation end-to-end.
+A **21-minute walkthrough and demo of GlucoTwin** is included at [`docs/GlucoTwin_Final_Video.mp4`](docs/GlucoTwin_Final_Video.mp4) — motivation, data pipeline, training results, and a live tour of all five dashboard views (Patient List, Digital Twin, What-if Simulator, Model Insights, About).
 
-> The same recording is also available as an **unlisted YouTube video** for easier streaming: **https://www.youtube.com/watch?v=LUcrP67LHn4**
+> The same recording is available as an **unlisted YouTube video**: **https://www.youtube.com/watch?v=LUcrP67LHn4**
 
 ### Submission deliverables
 
-| Deliverable | File |
-|---|---|
-| Demo video (21 min, mp4) | [`docs/GlucoTwin_Final_Video.mp4`](docs/GlucoTwin_Final_Video.mp4) — also on [YouTube (unlisted)](https://www.youtube.com/watch?v=LUcrP67LHn4) |
-| Architecture diagram (PDF) | [`docs/GlucoTwin_Architecture.pdf`](docs/GlucoTwin_Architecture.pdf) |
-| Presentation (PPTX) | [`docs/GlucoTwin_Presentation.pptx`](docs/GlucoTwin_Presentation.pptx) |
+| Deliverable | File / Link |
+| --- | --- |
+| **Live demo** | https://algoaura-meri-college-of-engineering-and.onrender.com/ |
+| Demo video (21 min) | [`docs/GlucoTwin_Final_Video.mp4`](docs/GlucoTwin_Final_Video.mp4) — also on [YouTube (unlisted)](https://www.youtube.com/watch?v=LUcrP67LHn4) |
+| Architecture diagram | [`docs/GlucoTwin_Architecture.pdf`](docs/GlucoTwin_Architecture.pdf) |
+| Presentation | [`docs/GlucoTwin_Presentation.pptx`](docs/GlucoTwin_Presentation.pptx) |
 | Detailed architecture write-up | [`docs/architecture.md`](docs/architecture.md) |
-
----
-
-## Open-source license
-
-GlucoTwin is released under the **MIT License** — see [`LICENSE`](LICENSE). Copyright (c) 2026 GlucoTwin Team. You are free to use, copy, modify, merge, publish, distribute, and sublicense the code, provided the copyright and permission notice are included.
+| Open-source license | MIT — see [`LICENSE`](LICENSE) |
 
 ---
 
@@ -225,176 +156,73 @@ GlucoTwin is released under the **MIT License** — see [`LICENSE`](LICENSE). Co
 
 ```mermaid
 flowchart LR
-    subgraph DataGen["1. Data generation"]
-        A["RNG seed 20260117"] --> B["generateEhr: 200 patients"]
+    subgraph DataGen["1. Data generation (fixed seed)"]
+        A["generateEhr: 200 patients"] --> B[("data CSVs (regenerated)")]
         A --> C["generateWearablesAll: 14d x 5min x 200"]
+        C --> B
     end
 
-    B --> D[("data/ehr.csv")]
-    C --> E[("data/wearables.csv")]
-    B --> F[("SQLite via Prisma")]
-    C --> F
+    B --> D[("SQLite via Prisma")]
+    C --> D
 
     subgraph Features["2. Feature fusion"]
-        G["computeFeatures: 6h CGM window + EHR -> 33 features"]
+        E["computeFeatures: 6h CGM window + EHR -> 33 features"]
     end
-    E --> G
-    D --> G
+    D --> E
 
-    subgraph Train["3. Training"]
-        G --> H["Patient-wise split 70/15/15"]
-        H --> I["LogisticRegression"]
-        H --> J["GBDT classifier 80 trees"]
-        H --> K["GBDT regressors +30/+60/+120"]
+    subgraph Train["3. Training & validation (Python)"]
+        E --> F["XGBoost + sklearn + SHAP (ml/python/)"]
     end
 
-    I --> L[("ml/logreg.json")]
-    J --> M[("ml/gbdt-classification.json")]
-    K --> N[("ml/gbdt-regression.json")]
-    J --> O[("ml/metrics.json")]
-
-    subgraph API["4. API"]
-        O --> P["GET /api/model/metrics"]
-        F --> Q["GET /api/patients"]
-        F --> R["GET /api/patients/id"]
-        F --> S["GET /api/patients/id/timeseries"]
-        M --> T["GET /api/patients/id/risk"]
-        U["Twin Simulator"] --> V["POST /api/patients/id/whatif"]
-        F --> W["GET /api/stream/id SSE"]
+    subgraph Serve["4. Serving (Next.js)"]
+        E --> G["TypeScript inference engine"]
+        G --> H["GET /api/patients/:id/risk"]
+        D --> I["GET /api/stream/:id (SSE)"]
+        G --> J["POST /api/patients/:id/whatif"]
     end
-    T --> U
 
     subgraph UI["5. Dashboard"]
-        Q --> X1["Patient List"]
-        R --> X2["Digital Twin View"]
-        T --> X2
-        S --> X2
-        V --> X3["What-if Simulator"]
-        P --> X4["Model Insights"]
-        W --> X2
-        X5["About"] --> X6["Disclaimer banner everywhere"]
+        H --> K["Patient List · Digital Twin · What-if · Insights · About"]
+        I --> K
+        J --> K
     end
-    Q --> X1
-    V --> X3
 ```
 
 ---
 
 ## How to run
 
-> Requires [Bun](https://bun.sh) (the demo runtime) and Node 18+. The first run generates all data and trains all models in ~15 seconds.
+**Web app** (requires [Bun](https://bun.sh)):
 
 ```bash
-# 1. Install dependencies
 bun install
-
-# 2. Create the SQLite schema
-bun run db:push
-
-# 3. Generate synthetic data + train models + seed the DB (~15s)
-bun run build:all
-
-# 4. Start the dashboard
-bun run dev
-#   -> http://localhost:3000
-
-# 5. (optional) Lint
-bun run lint
+bun run db:push          # SQLite schema
+bun run build:all        # synthetic data + train models + seed DB (~15 s)
+bun run dev              # -> http://localhost:3000
 ```
 
-After step 3 you will have:
+**Python ML pipeline:** see *"Reproduce the training"* above (requires `pip install -r requirements.txt`).
 
-- `data/ehr.csv` and `data/wearables.csv` — the synthetic dataset.
-- `ml/logreg.json`, `ml/gbdt-classification.json`, `ml/gbdt-regression{,-30,-60}.json`, `ml/metrics.json`, `ml/feature-names.json` — the trained model artifacts and metrics.
-- A populated SQLite database (`db/custom.db`) with 200 patients, 3 days of wearables per patient, and a risk-alert timeline.
-
-Open `http://localhost:3000` for the dashboard. The API is served from the same origin at `/api/...`.
-
----
-
-## Project structure
-
-```
-GlucoTwin/
-  README.md                          # this file
-  LICENSE                            # MIT
-  requirements.txt                   # documents the adapted Node stack + original Python intent
-  package.json                       # authoritative dependency list
-  data/
-    ehr.csv                          # 200 synthetic EHR records
-    wearables.csv                    # 806,400 synthetic wearable samples
-  prisma/
-    schema.prisma                    # Patient, WearableSample, RiskAlert, ModelArtifact
-  scripts/
-    build-all.ts                     # data gen + train + DB seed (one command)
-  src/
-    lib/
-      ml/
-        rng.ts                       # mulberry32 seeded PRNG (GLOBAL_SEED = 20260117)
-        stats.ts                     # mean / std / clamp helpers
-        types.ts                     # EhrRecord, WearableSample, LabeledSample, MetricsReport
-        data-generator.ts            # 200 patients + 14d wearables, physiological model
-        features.ts                  # 33-feature fusion, label = max(glucose)+120 > 180
-        logistic-regression.ts       # from-scratch LR (gradient descent, L2)
-        gbdt.ts                      # from-scratch GBDT (histogram, Newton, Saabas)
-        metrics.ts                   # ROC/PR/F1/confusion/threshold/lead-time
-        twin-simulator.ts            # what-if engine (meal / walk / sleep / skip-med)
-        predict.ts                   # inference: proba + curve + reasons
-      db.ts                          # Prisma client
-    app/
-      api/
-        health/route.ts              # GET  /api/health
-        patients/route.ts            # GET  /api/patients
-        patients/[id]/route.ts       # GET  /api/patients/:id
-        patients/[id]/timeseries/route.ts
-        patients/[id]/risk/route.ts
-        patients/[id]/whatif/route.ts
-        model/metrics/route.ts
-        stream/[id]/route.ts         # GET  /api/stream/:id (SSE)
-      page.tsx                       # the single doctor dashboard route
-      layout.tsx
-      globals.css
-    components/
-      glucotwin/                     # dashboard components (5 views + shared widgets)
-  ml/
-    gbdt-classification.json         # trained GBDT classifier
-    gbdt-regression.json             # trained GBDT regressor (+120 min)
-    gbdt-regression-30.json          # +30 min
-    gbdt-regression-60.json          # +60 min
-    logreg.json                      # trained logistic regression
-    metrics.json                     # ROC/PR/F1/confusion/lead-time/importance
-    feature-names.json               # the 33-feature contract
-  docs/
-    architecture.md                  # detailed architecture write-up
-    screenshots/                     # (drop screenshots here)
-```
+The dataset CSVs and the SQLite database are generated at runtime (not committed) — `build:all` recreates everything deterministically.
 
 ---
 
 ## API reference
 
-All endpoints are served from the same Next.js origin (port 3000), so CORS is not required. Next.js Route Handlers are self-documenting at their paths; the live list below is the canonical contract.
-
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/api/health` | Health check. Returns `{status, service, time, version}`. |
-| `GET` | `/api/patients` | List patients with their latest risk snapshot. Query params: `?search=`, `?band=Low\|Medium\|High`, `?limit=`. |
-| `GET` | `/api/patients/:id` | Full EHR profile for one virtual patient. |
-| `GET` | `/api/patients/:id/timeseries` | Recent CGM + HR + HRV + steps + sleep + meals. Query param: `?hours=24`. |
-| `GET` | `/api/patients/:id/risk` | Spike probability, predicted glucose curve with 95% band, top-6 SHAP-style reasons, predicted peak, model version. |
-| `POST` | `/api/patients/:id/whatif` | Run a what-if simulation. Body: `{carbs_g, walk_minutes, sleep_hours, skip_medication}`. Returns baseline vs simulated 3-h glucose curves, both peaks, both risk bands, delta risk, and a natural-language summary. |
-| `GET` | `/api/model/metrics` | Returns the contents of `ml/metrics.json` (ROC-AUC, PR-AUC, F1, confusion matrix, lead time, ROC/PR curves, feature importance, regression MAE). |
-| `GET` | `/api/stream/:id` | Server-Sent Events stream that replays a patient's recent wearables one sample at a time on a 1.5-s tick, mimicking a live CGM + wearable feed. Query param: `?speed=1500`. |
-
-Example:
+| `GET` | `/api/health` | Health check |
+| `GET` | `/api/patients` | Patients + latest risk snapshot (`?search=`, `?band=`, `?limit=`) |
+| `GET` | `/api/patients/:id` | Full EHR profile |
+| `GET` | `/api/patients/:id/timeseries` | Recent CGM + wearables (`?hours=24`) |
+| `GET` | `/api/patients/:id/risk` | Spike probability, predicted glucose curve with 95% band, top-6 SHAP-style reasons |
+| `POST` | `/api/patients/:id/whatif` | Baseline vs simulated 3-h glucose curves, delta risk, plain-language summary |
+| `GET` | `/api/model/metrics` | Serving-engine metrics (ROC/PR, confusion, lead time, importance) |
+| `GET` | `/api/stream/:id` | SSE live-replay of the CGM + wearable feed |
 
 ```bash
-# Latest risk for patient P0001
-curl http://localhost:3000/api/patients/P0001/risk
-
-# What if P0001 eats a 60g meal and walks 25 minutes?
-curl -X POST http://localhost:3000/api/patients/P0001/whatif \
-  -H 'Content-Type: application/json' \
+curl https://algoaura-meri-college-of-engineering-and.onrender.com/api/patients/P0001/risk
+curl -X POST .../api/patients/P0001/whatif -H 'Content-Type: application/json' \
   -d '{"carbs_g":60,"walk_minutes":25,"sleep_hours":7,"skip_medication":false}'
 ```
 
@@ -410,20 +238,19 @@ curl -X POST http://localhost:3000/api/patients/P0001/whatif \
 
 ![Model Insights — metrics table, confusion matrix, ROC/PR curves, feature importance](docs/screenshots/model-insights.png)
 
-![About — architecture diagram, tech stack, and disclaimers](docs/screenshots/about.png)
+---
+
+## Honest limitations
+
+- **Synthetic data only.** The metrics describe how well the model learned the physiological generator, not how it would perform on real patients.
+- **Not clinically validated.** No IRB, no real-patient study. Must not be used for diagnosis, dosing, or any clinical decision.
+- **Limited action space.** The what-if simulator explores meal / walk / sleep / medication-skip only; it does not recommend insulin doses.
+- **Fixed thresholds.** The 180 mg/dL spike threshold and operating probability threshold are not personalised per patient.
+
+**What comes next:** retrain on ethically-sourced real Indian T2DM CGM + EHR data (IRB-approved), per-patient threshold calibration, an insulin-dosing action with a closed-loop safety bound, and an outcome feedback loop.
 
 ---
 
-## Honest limitations and what comes next
+## Open-source license
 
-**What GlucoTwin is:** a working, end-to-end proof that a Type-2 diabetes digital twin — synthetic data generation, real trained models, explainable predictions, a physiological what-if simulator, a REST API, and a clinician dashboard — can be built and run in a single Next.js application, and that on a held-out test set of patients the model never saw, it achieves ROC-AUC 0.981 with an average of ~75 minutes of lead time on correct alerts.
-
-**What GlucoTwin is not:** a clinically validated medical device. The data is synthetic; the metrics describe how well the model learned the data generator, not how it would perform on real Indian T2DM patients; the simulator explores a limited action space; and there is no closed-loop control of insulin.
-
-**What comes next, in rough priority order:**
-
-1. Retrain on real, ethically-sourced, de-identified Indian T2DM CGM + EHR data (IRB-approved).
-2. Calibrate the spike threshold and the probability threshold per-patient from their own history.
-3. Add an insulin-dosing action to the simulator (with a closed-loop safety bound).
-4. Add an outcome feedback loop so the model learns from its own prediction errors.
-5. Run a prospective clinical study against standard care.
+GlucoTwin is released under the **MIT License** — see [`LICENSE`](LICENSE). Copyright (c) 2026 GlucoTwin Team.
